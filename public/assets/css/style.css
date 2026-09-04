@@ -51,6 +51,26 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 @media (max-width: 1000px) {
   .grid { grid-template-columns: 1fr; }
 }
+
+/* Рабочий стол: карта на весь экран + скроллящиеся колонки справа */
+.desk-app { max-width: none; padding-top: 12px; }
+.desk { display: flex; gap: 16px; align-items: flex-start; }
+.desk-map {
+  position: sticky; top: 0; height: 100vh;
+  flex: 1 1 auto; min-width: 0;
+  display: flex; flex-direction: column;
+}
+.desk-map h2 { flex: 0 0 auto; }
+.desk-map .map-box { flex: 1 1 auto; height: auto; min-height: 420px; }
+.desk-side {
+  width: 380px; flex: 0 0 380px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+@media (max-width: 1100px) {
+  .desk { flex-direction: column; }
+  .desk-map { position: static; height: 60vh; }
+  .desk-side { width: 100%; flex: none; }
+}
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
