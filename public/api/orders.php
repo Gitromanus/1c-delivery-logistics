@@ -68,17 +68,18 @@ foreach ($items as $i => $row) {
         continue;
     }
     $address = trim((string) $row['address']);
-    $zoneId = ZoneMatcher::matchZoneId($pdo, $address);
 
     $lat = isset($row['lat']) ? (float) $row['lat'] : null;
     $lon = isset($row['lon']) ? (float) $row['lon'] : null;
-    if ($lat === null && $lon === null && $yandexKey !== '') {
+    if ($lat === null && $lon === null) {
         $geo = Geocoder::geocode($address, $yandexKey, $dadataToken);
         if ($geo) {
             $lat = $geo['lat'];
             $lon = $geo['lon'];
         }
     }
+    // Зона определяется по координатам заявки (попадание точки в полигон зоны)
+    $zoneId = ZoneMatcher::matchByCoords($pdo, $lat, $lon);
 
     try {
         $upsert->execute([
