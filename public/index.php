@@ -246,10 +246,26 @@ if (typeof ymaps !== 'undefined') {
         geoBtn.textContent = 'Геокодинг…';
         try {
           const r = await fetch('api/geocode_front.php?date=<?= urlencode($date) ?>', { method: 'POST' });
-          const data = await r.json();
+          const text = await r.text();
+          let data;
+          try {
+            data = JSON.parse(text);
+          } catch (e) {
+            alert('Сервер вернул не JSON (вероятно, защита хостинга «Подтвердите действие» или ошибка PHP). Повторите через несколько секунд.\n\nОтвет:\n' + text.slice(0, 160));
+            geoBtn.disabled = false;
+            geoBtn.textContent = 'Геокод с карты';
+            return;
+          }
           const done = data.geocoded || 0;
           const failed = data.failed || 0;
-          alert(done + ' добавлено, ' + failed + ' не найдено' + (failed ? '. Запустите ещё раз.' : '.'));
+          let msg = done + ' добавлено, ' + failed + ' не найдено' + (failed ? '.' : '.');
+          if (failed && data.sample_errors && data.sample_errors.length) {
+            msg += '\nНе найдены:';
+            data.sample_errors.forEach(function (e) {
+              msg += '\n• ' + (e.address || '') + ' — ' + (e.error || '');
+            });
+          }
+          alert(msg);
           location.reload();
         } catch (e) {
           alert(e.message);

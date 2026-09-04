@@ -2,7 +2,7 @@
 /**
  * Геокодирование заявок без координат для выбранной даты — серверная часть,
  * вызывается кнопкой «Геокод с карты» (без авторизации, как save_coords.php).
- * Обрабатывает батч до 20 заявок за раз.
+ * Обрабатывает батч до 20 заявок за раз, с паузой между запросами (лимиты Nominatim).
  */
 require dirname(__DIR__) . '/bootstrap.php';
 
@@ -29,6 +29,7 @@ $rows = $stmt->fetchAll();
 $upd = $pdo->prepare('UPDATE orders SET lat = ?, lon = ? WHERE id = ?');
 $ok = 0;
 $fail = 0;
+$errors = [];
 
 foreach ($rows as $row) {
     $meta = Geocoder::geocodeWithMeta($row['address'], $yandexKey);
@@ -37,7 +38,16 @@ foreach ($rows as $row) {
         $ok++;
     } else {
         $fail++;
+        if (count($errors) < 5) {
+            $errors[] = [
+                'id' => (int) $row['id'],
+                'address' => $row['address'],
+                'error' => $meta['error'],
+            ];
+        }
     }
+    // Pace: Nominatim просит не чаще ~1 запроса/сек
+    usleep(1100000);
 }
 
 echo json_encode([
@@ -45,4 +55,5 @@ echo json_encode([
     'geocoded' => $ok,
     'failed' => $fail,
     'left_batch' => count($rows),
+    'sample_errors' => $errors,
 ], JSON_UNESCAPED_UNICODE);
