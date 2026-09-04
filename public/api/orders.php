@@ -4,7 +4,7 @@ require dirname(__DIR__) . '/bootstrap.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-$config = require dirname(__DIR__, 2) . '/config.php';
+$config = require (defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__)) . '/config.php';
 $apiKey = (string) ($config['api_key'] ?? '');
 
 $given = $_SERVER['HTTP_X_API_KEY'] ?? ($_POST['api_key'] ?? '');
@@ -85,7 +85,7 @@ foreach ($items as $i => $row) {
 }
 
 echo json_encode([
-    'ok' => $saved > 0 && !$errors,
+    'ok' => empty($errors),
     'saved' => $saved,
     'errors' => $errors,
 ], JSON_UNESCAPED_UNICODE);

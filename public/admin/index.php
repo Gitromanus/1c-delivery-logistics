@@ -1,7 +1,7 @@
 <?php
 session_start();
 require dirname(__DIR__) . '/bootstrap.php';
-$config = require dirname(__DIR__, 2) . '/config.php';
+$config = require (defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__)) . '/config.php';
 
 $error = '';
 if (isset($_POST['password'])) {
