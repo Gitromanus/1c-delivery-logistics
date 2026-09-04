@@ -150,10 +150,10 @@ function h(?string $s): string
       <?php endif; ?>
 
       <h2 style="margin-top:16px">Нераспределённые</h2>
-      <?php if (!$freeOrders): ?>
-        <p class="muted">Нет заявок со статусом «new».</p>
-      <?php else: ?>
-        <div id="unassignedZone">
+      <div id="unassignedZone" style="min-height:72px;border:2px dashed #2f3546;border-radius:10px;padding:8px;background:#14161f;">
+        <?php if (!$freeOrders): ?>
+          <p class="muted" style="text-align:center;padding:8px 0">Пусто — перетащите заявку сюда из рейса</p>
+        <?php else: ?>
           <?php foreach ($freeOrders as $o): ?>
             <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="" draggable="true"
                  style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2f3546;border-radius:8px;margin-bottom:6px;background:#1c2130;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.25)">
@@ -167,8 +167,8 @@ function h(?string $s): string
               <span style="flex:0 0 auto;font-size:12px;font-weight:700;background:#2b3245;color:#dfe3ea;border-radius:20px;padding:3px 10px"><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?> кг</span>
             </div>
           <?php endforeach; ?>
-        </div>
-      <?php endif; ?>
+        <?php endif; ?>
+      </div>
     </section>
 
     <section class="panel">
