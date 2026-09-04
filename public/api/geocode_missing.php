@@ -15,29 +15,26 @@ if (empty($_SESSION['admin_ok']) && !hash_equals($apiKey, (string) $given)) {
     exit;
 }
 
-if ($yandexKey === '') {
-    echo json_encode(['ok' => false, 'error' => 'yandex_maps_key пустой']);
-    exit;
-}
-
 $pdo = Database::pdo();
 $rows = $pdo->query(
-    "SELECT id, address FROM orders WHERE (lat IS NULL OR lon IS NULL) AND address <> '' ORDER BY id DESC LIMIT 15"
+    "SELECT id, address FROM orders WHERE (lat IS NULL OR lon IS NULL) AND address <> '' ORDER BY id DESC LIMIT 20"
 )->fetchAll();
 
 $upd = $pdo->prepare('UPDATE orders SET lat = ?, lon = ? WHERE id = ?');
 $ok = 0;
 $fail = 0;
 $errors = [];
+$providers = [];
 
 foreach ($rows as $row) {
     $meta = Geocoder::geocodeWithMeta($row['address'], $yandexKey);
     if ($meta['point']) {
         $upd->execute([$meta['point']['lat'], $meta['point']['lon'], $row['id']]);
         $ok++;
+        $providers[$meta['provider'] ?? '?'] = ($providers[$meta['provider'] ?? '?'] ?? 0) + 1;
     } else {
         $fail++;
-        if (count($errors) < 5) {
+        if (count($errors) < 8) {
             $errors[] = [
                 'id' => (int) $row['id'],
                 'address' => $row['address'],
@@ -45,7 +42,8 @@ foreach ($rows as $row) {
             ];
         }
     }
-    usleep(200000);
+    // Nominatim просит не чаще ~1 запроса/сек
+    usleep(1100000);
 }
 
 echo json_encode([
@@ -53,8 +51,6 @@ echo json_encode([
     'geocoded' => $ok,
     'failed' => $fail,
     'left_batch' => count($rows),
-    'hint' => $ok === 0
-        ? 'HTTP-геокодер часто не принимает ключ только JS API. Используйте кнопку «Геокод с карты» на главной.'
-        : null,
+    'providers' => $providers,
     'sample_errors' => $errors,
 ], JSON_UNESCAPED_UNICODE);
