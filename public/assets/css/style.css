@@ -110,6 +110,12 @@ code { color: var(--accent); font-size: 0.85em; }
   padding: 4px 7px; border-radius: 6px;
 }
 .btn-del:hover { background: rgba(248,113,113,.15); }
+.btn-icon {
+  background: transparent; border: none; color: var(--muted);
+  cursor: pointer; font-size: 0.95rem; line-height: 1;
+  padding: 4px 7px; border-radius: 6px;
+}
+.btn-icon:hover { background: rgba(34,197,94,.15); color: var(--accent); }
 .modal-overlay {
   display: none; position: fixed; inset: 0; z-index: 1000;
   background: rgba(0,0,0,.55);
