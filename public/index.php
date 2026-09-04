@@ -188,9 +188,43 @@ function h(?string $s): string
   </div>
   <footer class="footer">УТ 11 · Agent+</footer>
 </div>
+
+<!-- Окно результатов геокодирования (текст можно скопировать) -->
+<div id="geoLog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;color:#111;max-width:760px;width:100%;max-height:82vh;display:flex;flex-direction:column;border-radius:8px;padding:16px;box-sizing:border-box;box-shadow:0 10px 40px rgba(0,0,0,.4);">
+    <div style="margin-bottom:8px;font-weight:bold;font-size:14px;">Результат геокодирования</div>
+    <textarea id="geoLogText" readonly style="flex:1;width:100%;min-height:200px;font-family:monospace;font-size:12px;resize:vertical;box-sizing:border-box;"></textarea>
+    <div style="margin-top:10px;text-align:right;">
+      <button type="button" class="btn btn-primary" id="geoLogCopy">Скопировать</button>
+      <button type="button" class="btn btn-ghost" id="geoLogClose">Закрыть и обновить</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const mapPoints = <?= json_encode($mapPoints, JSON_UNESCAPED_UNICODE) ?>;
 const needGeo = <?= json_encode($needGeo, JSON_UNESCAPED_UNICODE) ?>;
+
+// Окно результатов геокодирования (можно скопировать)
+function showGeoLog(lines) {
+  const ta = document.getElementById('geoLogText');
+  if (ta) ta.value = lines.join('\n');
+  const box = document.getElementById('geoLog');
+  if (box) box.style.display = 'flex';
+}
+const logClose = document.getElementById('geoLogClose');
+const logCopy = document.getElementById('geoLogCopy');
+if (logClose) logClose.addEventListener('click', () => location.reload());
+if (logCopy) logCopy.addEventListener('click', () => {
+  const ta = document.getElementById('geoLogText');
+  if (!ta) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(ta.value).then(() => { logCopy.textContent = 'Скопировано'; });
+  } else {
+    ta.focus(); ta.select();
+    try { document.execCommand('copy'); logCopy.textContent = 'Скопировано'; } catch (e) {}
+  }
+});
 
 document.getElementById('rebuildBtn').addEventListener('click', async () => {
   const btn = document.getElementById('rebuildBtn');
@@ -251,24 +285,32 @@ if (typeof ymaps !== 'undefined') {
           try {
             data = JSON.parse(text);
           } catch (e) {
-            alert('Сервер вернул не JSON (вероятно, защита хостинга «Подтвердите действие» или ошибка PHP). Повторите через несколько секунд.\n\nОтвет:\n' + text.slice(0, 160));
+            showGeoLog([
+              'Сервер вернул не JSON (возможно, защита хостинга «Подтвердите действие» или ошибка PHP).',
+              'Повторите через несколько секунд.',
+              '',
+              'Ответ:',
+              text.slice(0, 500),
+            ]);
             geoBtn.disabled = false;
             geoBtn.textContent = 'Геокод с карты';
             return;
           }
           const done = data.geocoded || 0;
           const failed = data.failed || 0;
-          let msg = done + ' добавлено, ' + failed + ' не найдено' + (failed ? '.' : '.');
+          const lines = [done + ' добавлено, ' + failed + ' не найдено.'];
           if (failed && data.sample_errors && data.sample_errors.length) {
-            msg += '\nНе найдены:';
+            lines.push('');
+            lines.push('Не найдены:');
             data.sample_errors.forEach(function (e) {
-              msg += '\n• ' + (e.address || '') + ' — ' + (e.error || '');
+              lines.push((e.address || '') + '\t' + (e.error || ''));
             });
           }
-          alert(msg);
-          location.reload();
+          showGeoLog(lines);
+          geoBtn.disabled = false;
+          geoBtn.textContent = 'Геокод с карты';
         } catch (e) {
-          alert(e.message);
+          showGeoLog([e.message]);
           geoBtn.disabled = false;
           geoBtn.textContent = 'Геокод с карты';
         }
