@@ -6,6 +6,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 $config = require (defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__)) . '/config.php';
 $yandexKey = (string) ($config['yandex_geocoder_key'] ?? ($config['yandex_maps_key'] ?? ''));
+$dadataToken = (string) ($config['dadata_token'] ?? '');
 $apiKey = (string) ($config['api_key'] ?? '');
 $given = $_SERVER['HTTP_X_API_KEY'] ?? '';
 
@@ -27,7 +28,7 @@ $errors = [];
 $providers = [];
 
 foreach ($rows as $row) {
-    $meta = Geocoder::geocodeWithMeta($row['address'], $yandexKey);
+    $meta = Geocoder::geocodeWithMeta($row['address'], $yandexKey, $dadataToken);
     if ($meta['point']) {
         $upd->execute([$meta['point']['lat'], $meta['point']['lon'], $row['id']]);
         $ok++;

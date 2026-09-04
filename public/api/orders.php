@@ -7,6 +7,7 @@ header('Content-Type: application/json; charset=utf-8');
 $config = require (defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__)) . '/config.php';
 $apiKey = (string) ($config['api_key'] ?? '');
 $yandexKey = (string) ($config['yandex_geocoder_key'] ?? ($config['yandex_maps_key'] ?? ''));
+$dadataToken = (string) ($config['dadata_token'] ?? '');
 
 $given = $_SERVER['HTTP_X_API_KEY'] ?? ($_POST['api_key'] ?? '');
 if ($apiKey === '' || !hash_equals($apiKey, (string) $given)) {
@@ -72,7 +73,7 @@ foreach ($items as $i => $row) {
     $lat = isset($row['lat']) ? (float) $row['lat'] : null;
     $lon = isset($row['lon']) ? (float) $row['lon'] : null;
     if ($lat === null && $lon === null && $yandexKey !== '') {
-        $geo = Geocoder::geocode($address, $yandexKey);
+        $geo = Geocoder::geocode($address, $yandexKey, $dadataToken);
         if ($geo) {
             $lat = $geo['lat'];
             $lon = $geo['lon'];

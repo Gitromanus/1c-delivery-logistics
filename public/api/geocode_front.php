@@ -10,6 +10,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 $config = require (defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__)) . '/config.php';
 $yandexKey = (string) ($config['yandex_geocoder_key'] ?? ($config['yandex_maps_key'] ?? ''));
+$dadataToken = (string) ($config['dadata_token'] ?? '');
 
 $date = $_GET['date'] ?? $_POST['date'] ?? date('Y-m-d');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
@@ -32,7 +33,7 @@ $fail = 0;
 $errors = [];
 
 foreach ($rows as $row) {
-    $meta = Geocoder::geocodeWithMeta($row['address'], $yandexKey);
+    $meta = Geocoder::geocodeWithMeta($row['address'], $yandexKey, $dadataToken);
     if ($meta['point']) {
         $upd->execute([$meta['point']['lat'], $meta['point']['lon'], $row['id']]);
         $ok++;

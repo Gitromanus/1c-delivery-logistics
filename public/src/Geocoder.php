@@ -10,17 +10,25 @@ class Geocoder
     private const LON_MIN = 36.8;
     private const LON_MAX = 41.5;
 
-    public static function geocode(string $address, string $yandexKey = ''): ?array
+    public static function geocode(string $address, string $yandexKey = '', string $dadataToken = ''): ?array
     {
-        $meta = self::geocodeWithMeta($address, $yandexKey);
+        $meta = self::geocodeWithMeta($address, $yandexKey, $dadataToken);
         return $meta['point'] ?? null;
     }
 
-    public static function geocodeWithMeta(string $address, string $yandexKey = ''): array
+    public static function geocodeWithMeta(string $address, string $yandexKey = '', string $dadataToken = ''): array
     {
         $address = trim($address);
         if ($address === '') {
             return ['point' => null, 'error' => 'empty address', 'provider' => null];
+        }
+
+        // Dadata — лучшая точность по РФ (бесплатно до ~10k/сутки)
+        if ($dadataToken !== '') {
+            $dd = self::dadata($address, $dadataToken);
+            if ($dd['point']) {
+                return ['point' => $dd['point'], 'error' => null, 'provider' => 'dadata'];
+            }
         }
 
         if ($yandexKey !== '') {
@@ -221,6 +229,41 @@ class Geocoder
         return ['point' => null, 'error' => 'no results'];
     }
 
+    private static function dadata(string $address, string $token): array
+    {
+        if ($token === '') {
+            return ['point' => null, 'error' => 'no token'];
+        }
+        $url = 'https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address';
+        $json = self::httpPostJson($url, json_encode([
+            'query' => $address,
+            'count' => 5,
+        ], JSON_UNESCAPED_UNICODE), [
+            'Content-Type: application/json',
+            'Accept: application/json',
+            'Authorization: Token ' . $token,
+        ]);
+        if ($json === null) {
+            return ['point' => null, 'error' => 'network'];
+        }
+        $data = json_decode($json, true);
+        if (!is_array($data) || empty($data['suggestions'])) {
+            return ['point' => null, 'error' => 'no results'];
+        }
+        foreach ($data['suggestions'] as $s) {
+            $d = $s['data'] ?? [];
+            if (!isset($d['geo_lat'], $d['geo_lon'])) {
+                continue;
+            }
+            $lat = (float) $d['geo_lat'];
+            $lon = (float) $d['geo_lon'];
+            if (self::inRegion($lat, $lon)) {
+                return ['point' => ['lat' => $lat, 'lon' => $lon], 'error' => null];
+            }
+        }
+        return ['point' => null, 'error' => 'no results in region'];
+    }
+
     private static function photon(string $address): array
     {
         // Photon (komoot) — OSM, бесплатно, без ключа. bbox ограничивает зону доставки.
@@ -251,6 +294,25 @@ class Geocoder
             }
         }
         return ['point' => null, 'error' => 'no results in region'];
+    }
+
+    private static function httpPostJson(string $url, string $body, array $headers = []): ?string
+    {
+        $headerLines = '';
+        foreach ($headers as $h) {
+            $headerLines .= $h . "\r\n";
+        }
+        $ctx = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'timeout' => 15,
+                'ignore_errors' => true,
+                'header' => $headerLines . 'Content-Length: ' . strlen($body) . "\r\n",
+                'content' => $body,
+            ],
+        ]);
+        $res = @file_get_contents($url, false, $ctx);
+        return $res === false ? null : $res;
     }
 
     private static function httpGet(string $url, array $headers = []): ?string

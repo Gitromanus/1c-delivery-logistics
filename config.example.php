@@ -13,6 +13,8 @@ return [
     'yandex_maps_key' => '',
     // Ключ HTTP API Геокодера (для серверного геокодинга). Если пусто — берётся yandex_maps_key
     'yandex_geocoder_key' => '',
+    // API-ключ Dadata (точный геокодинг по РФ, бесплатно ~10k/сутки). Регистрация на dadata.ru
+    'dadata_token' => '',
     'admin_password' => 'admin',
     'timezone' => 'Europe/Moscow',
 ];
