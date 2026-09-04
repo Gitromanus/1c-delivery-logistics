@@ -106,6 +106,7 @@ function h(?string $s): string
         <input type="date" name="date" value="<?= h($date) ?>" onchange="this.form.submit()">
       </form>
       <button type="button" class="btn btn-ghost" id="rebuildBtn">Пересобрать рейсы</button>
+      <button type="button" class="btn btn-ghost" id="rezoneBtn" title="Временный инструмент">Пересчитать зоны</button>
       <?php if ($yandexKey !== '' && count($needGeo) > 0): ?>
       <button type="button" class="btn btn-primary" id="geocodeBtn">Геокод с карты (<?= count($needGeo) ?>)</button>
       <?php endif; ?>
@@ -260,6 +261,20 @@ document.getElementById('rebuildBtn').addEventListener('click', async () => {
     alert(e.message);
     btn.disabled = false;
     btn.textContent = 'Пересобрать рейсы';
+  }
+});
+
+document.getElementById('rezoneBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('rezoneBtn');
+  btn.disabled = true;
+  try {
+    const r = await fetch('api/reassign_zones.php?date=<?= urlencode($date) ?>', { method: 'POST' });
+    const data = await r.json();
+    alert('Обработано: ' + data.processed + ', установлено зон: ' + data.updated + ', очищено: ' + data.cleared);
+    location.reload();
+  } catch (e) {
+    alert(e.message);
+    btn.disabled = false;
   }
 });
 
