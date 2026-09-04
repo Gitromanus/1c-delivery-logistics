@@ -45,33 +45,61 @@ $pdo = Database::pdo();
 $msg = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    if ($_POST['action'] === 'add_zone') {
-        $pdo->prepare('INSERT INTO zones (name, code, keywords, sort_order) VALUES (?,?,?,?)')
-            ->execute([
-                trim($_POST['name'] ?? ''),
-                trim($_POST['code'] ?? '') ?: null,
-                trim($_POST['keywords'] ?? '') ?: null,
-                (int) ($_POST['sort_order'] ?? 0),
-            ]);
-        $msg = 'Зона добавлена';
-    }
-    if ($_POST['action'] === 'add_vehicle') {
-        $pdo->prepare('INSERT INTO vehicles (name, plate, capacity_kg) VALUES (?,?,?)')
-            ->execute([
-                trim($_POST['name'] ?? ''),
-                trim($_POST['plate'] ?? '') ?: null,
-                (float) ($_POST['capacity_kg'] ?? 1000),
-            ]);
-        $msg = 'Машина добавлена';
-    }
-    if ($_POST['action'] === 'bind') {
-        $pdo->prepare('INSERT IGNORE INTO vehicle_zones (vehicle_id, zone_id, is_primary) VALUES (?,?,?)')
-            ->execute([
-                (int) $_POST['vehicle_id'],
-                (int) $_POST['zone_id'],
-                !empty($_POST['is_primary']) ? 1 : 0,
-            ]);
-        $msg = 'Привязка сохранена';
+    switch ($_POST['action']) {
+        case 'add_zone':
+            $pdo->prepare('INSERT INTO zones (name, code, sort_order) VALUES (?,?,?)')
+                ->execute([
+                    trim($_POST['name'] ?? ''),
+                    trim($_POST['code'] ?? '') ?: null,
+                    (int) ($_POST['sort_order'] ?? 0),
+                ]);
+            $msg = 'Зона добавлена';
+            break;
+
+        case 'add_vehicle':
+            $pdo->prepare('INSERT INTO vehicles (name, plate, capacity_kg) VALUES (?,?,?)')
+                ->execute([
+                    trim($_POST['name'] ?? ''),
+                    trim($_POST['plate'] ?? '') ?: null,
+                    (float) ($_POST['capacity_kg'] ?? 1000),
+                ]);
+            $msg = 'Машина добавлена';
+            break;
+
+        case 'bind':
+            $pdo->prepare('INSERT IGNORE INTO vehicle_zones (vehicle_id, zone_id, is_primary) VALUES (?,?,?)')
+                ->execute([
+                    (int) $_POST['vehicle_id'],
+                    (int) $_POST['zone_id'],
+                    !empty($_POST['is_primary']) ? 1 : 0,
+                ]);
+            $msg = 'Привязка сохранена';
+            break;
+
+        case 'delete_zone':
+            $id = (int) ($_POST['id'] ?? 0);
+            if ($id) {
+                $pdo->prepare('DELETE FROM vehicle_zones WHERE zone_id=?')->execute([$id]);
+                $pdo->prepare('DELETE FROM zone_polygons WHERE zone_id=?')->execute([$id]);
+                $pdo->prepare('DELETE FROM zones WHERE id=?')->execute([$id]);
+                $msg = 'Зона удалена';
+            }
+            break;
+
+        case 'delete_vehicle':
+            $id = (int) ($_POST['id'] ?? 0);
+            if ($id) {
+                $pdo->prepare('DELETE FROM vehicle_zones WHERE vehicle_id=?')->execute([$id]);
+                $pdo->prepare('DELETE FROM vehicles WHERE id=?')->execute([$id]);
+                $msg = 'Машина удалена';
+            }
+            break;
+
+        case 'delete_bind':
+            $pdo->prepare('DELETE FROM vehicle_zones WHERE vehicle_id=? AND zone_id=?')
+                ->execute([(int) ($_POST['vehicle_id'] ?? 0), (int) ($_POST['zone_id'] ?? 0)]);
+            $msg = 'Привязка удалена';
+            break;
     }
 }
 
@@ -122,76 +150,78 @@ foreach ($zonePolys as $zp) {
 
   <div class="admin-nav muted">API: POST /api/orders.php · ключ в config.php (X-Api-Key)</div>
 
-  <div class="grid" style="grid-template-columns:1fr 1fr">
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr">
     <section class="panel">
-      <h2>Зоны</h2>
+      <div class="panel-head">
+        <h2>Зоны</h2>
+        <button class="btn btn-ghost btn-sm" type="button" onclick="openModal('zoneModal')">+ Добавить</button>
+      </div>
       <table>
-        <tr><th>Название</th><th>Ключевые слова</th></tr>
+        <tr><th>Название</th><th></th></tr>
         <?php foreach ($zones as $z): ?>
           <tr>
             <td><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:<?= htmlspecialchars(!empty($z['poly_color']) ? $z['poly_color'] : '#ccc') ?>;margin-right:6px;vertical-align:middle"></span><?= htmlspecialchars($z['name']) ?></td>
-            <td class="muted"><?= htmlspecialchars((string) $z['keywords']) ?></td>
+            <td style="text-align:right;white-space:nowrap">
+              <form method="post" onsubmit="return confirm('Удалить зону «<?= htmlspecialchars($z['name'], ENT_QUOTES) ?>» и все её привязки/полигон?')">
+                <input type="hidden" name="action" value="delete_zone">
+                <input type="hidden" name="id" value="<?= (int) $z['id'] ?>">
+                <button class="btn-del" title="Удалить" aria-label="Удалить">✕</button>
+              </form>
+            </td>
           </tr>
         <?php endforeach; ?>
       </table>
-      <form method="post" style="margin-top:14px">
-        <input type="hidden" name="action" value="add_zone">
-        <input type="text" name="name" placeholder="Название" required style="width:100%;margin-bottom:8px">
-        <input type="text" name="keywords" placeholder="Ключевые слова: Молодёжн;Молодежн" style="width:100%;margin-bottom:8px">
-        <button class="btn btn-primary" type="submit">Добавить зону</button>
-      </form>
     </section>
 
     <section class="panel">
-      <h2>Машины</h2>
+      <div class="panel-head">
+        <h2>Машины</h2>
+        <button class="btn btn-ghost btn-sm" type="button" onclick="openModal('vehicleModal')">+ Добавить</button>
+      </div>
       <table>
-        <tr><th>Название</th><th>Номер</th><th>Кг</th></tr>
+        <tr><th>Название</th><th>Номер</th><th>Кг</th><th></th></tr>
         <?php foreach ($vehicles as $v): ?>
           <tr>
             <td><?= htmlspecialchars($v['name']) ?></td>
             <td><?= htmlspecialchars((string) $v['plate']) ?></td>
             <td><?= htmlspecialchars((string) $v['capacity_kg']) ?></td>
+            <td style="text-align:right;white-space:nowrap">
+              <form method="post" onsubmit="return confirm('Удалить машину «<?= htmlspecialchars($v['name'], ENT_QUOTES) ?>» и все её привязки?')">
+                <input type="hidden" name="action" value="delete_vehicle">
+                <input type="hidden" name="id" value="<?= (int) $v['id'] ?>">
+                <button class="btn-del" title="Удалить" aria-label="Удалить">✕</button>
+              </form>
+            </td>
           </tr>
         <?php endforeach; ?>
       </table>
-      <form method="post" style="margin-top:14px">
-        <input type="hidden" name="action" value="add_vehicle">
-        <input type="text" name="name" placeholder="Газель …" required style="width:100%;margin-bottom:8px">
-        <input type="text" name="plate" placeholder="Госномер" style="width:100%;margin-bottom:8px">
-        <input type="number" step="0.01" name="capacity_kg" value="900" style="width:100%;margin-bottom:8px">
-        <button class="btn btn-primary" type="submit">Добавить машину</button>
-      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Привязка ТС → зона</h2>
+        <button class="btn btn-ghost btn-sm" type="button" onclick="openModal('bindModal')">+ Добавить</button>
+      </div>
+      <table>
+        <tr><th>Машина</th><th>Зона</th><th>Тип</th><th></th></tr>
+        <?php foreach ($binds as $b): ?>
+          <tr>
+            <td><?= htmlspecialchars($b['vname']) ?></td>
+            <td><?= htmlspecialchars($b['zname']) ?></td>
+            <td class="muted"><?= $b['is_primary'] ? 'осн.' : 'резерв' ?></td>
+            <td style="text-align:right;white-space:nowrap">
+              <form method="post" onsubmit="return confirm('Удалить привязку «<?= htmlspecialchars($b['vname'], ENT_QUOTES) ?> → <?= htmlspecialchars($b['zname'], ENT_QUOTES) ?>»?')">
+                <input type="hidden" name="action" value="delete_bind">
+                <input type="hidden" name="vehicle_id" value="<?= (int) $b['vehicle_id'] ?>">
+                <input type="hidden" name="zone_id" value="<?= (int) $b['zone_id'] ?>">
+                <button class="btn-del" title="Удалить" aria-label="Удалить">✕</button>
+              </form>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      </table>
     </section>
   </div>
-
-  <section class="panel" style="margin-top:16px">
-    <h2>Привязка ТС → зона</h2>
-    <table>
-      <tr><th>Машина</th><th>Зона</th><th>Основная</th></tr>
-      <?php foreach ($binds as $b): ?>
-        <tr>
-          <td><?= htmlspecialchars($b['vname']) ?></td>
-          <td><?= htmlspecialchars($b['zname']) ?></td>
-          <td><?= $b['is_primary'] ? 'да' : 'резерв' ?></td>
-        </tr>
-      <?php endforeach; ?>
-    </table>
-    <form method="post" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:end">
-      <input type="hidden" name="action" value="bind">
-      <select name="vehicle_id">
-        <?php foreach ($vehicles as $v): ?>
-          <option value="<?= (int) $v['id'] ?>"><?= htmlspecialchars($v['name']) ?></option>
-        <?php endforeach; ?>
-      </select>
-      <select name="zone_id">
-        <?php foreach ($zones as $z): ?>
-          <option value="<?= (int) $z['id'] ?>"><?= htmlspecialchars($z['name']) ?></option>
-        <?php endforeach; ?>
-      </select>
-      <label class="muted"><input type="checkbox" name="is_primary" value="1" checked> основная</label>
-      <button class="btn btn-primary" type="submit">Привязать</button>
-    </form>
-  </section>
 
   <section class="panel" style="margin-top:16px">
     <h2>Полигоны зон</h2>
@@ -220,6 +250,74 @@ foreach ($zonePolys as $zp) {
     <?php endif; ?>
   </section>
 </div>
+
+<!-- Модалка: добавление зоны -->
+<div class="modal-overlay" id="zoneModal" onclick="if(event.target===this)closeModal('zoneModal')">
+  <form method="post" class="modal" onsubmit="closeModal('zoneModal')">
+    <h3>Добавить зону</h3>
+    <input type="hidden" name="action" value="add_zone">
+    <label>Название</label>
+    <input type="text" name="name" placeholder="Например: Ростов-на-Дону" required>
+    <label>Код (необязательно)</label>
+    <input type="text" name="code" placeholder="RND">
+    <label>Порядок сортировки</label>
+    <input type="number" name="sort_order" value="0">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" type="button" onclick="closeModal('zoneModal')">Отмена</button>
+      <button class="btn btn-primary" type="submit">Добавить</button>
+    </div>
+  </form>
+</div>
+
+<!-- Модалка: добавление машины -->
+<div class="modal-overlay" id="vehicleModal" onclick="if(event.target===this)closeModal('vehicleModal')">
+  <form method="post" class="modal" onsubmit="closeModal('vehicleModal')">
+    <h3>Добавить машину</h3>
+    <input type="hidden" name="action" value="add_vehicle">
+    <label>Название</label>
+    <input type="text" name="name" placeholder="Газель …" required>
+    <label>Госномер</label>
+    <input type="text" name="plate" placeholder="А000АА 161">
+    <label>Грузоподъёмность, кг</label>
+    <input type="number" step="0.01" name="capacity_kg" value="900">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" type="button" onclick="closeModal('vehicleModal')">Отмена</button>
+      <button class="btn btn-primary" type="submit">Добавить</button>
+    </div>
+  </form>
+</div>
+
+<!-- Модалка: привязка ТС → зона -->
+<div class="modal-overlay" id="bindModal" onclick="if(event.target===this)closeModal('bindModal')">
+  <form method="post" class="modal" onsubmit="closeModal('bindModal')">
+    <h3>Привязать машину к зоне</h3>
+    <input type="hidden" name="action" value="bind">
+    <label>Машина</label>
+    <select name="vehicle_id">
+      <?php foreach ($vehicles as $v): ?>
+        <option value="<?= (int) $v['id'] ?>"><?= htmlspecialchars($v['name']) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <label>Зона</label>
+    <select name="zone_id">
+      <?php foreach ($zones as $z): ?>
+        <option value="<?= (int) $z['id'] ?>"><?= htmlspecialchars($z['name']) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px">
+      <input type="checkbox" name="is_primary" value="1" checked> Основная зона
+    </label>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" type="button" onclick="closeModal('bindModal')">Отмена</button>
+      <button class="btn btn-primary" type="submit">Привязать</button>
+    </div>
+  </form>
+</div>
+
+<script>
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+</script>
 
 <?php if (!empty($config['yandex_maps_key'])): ?>
 <script>
