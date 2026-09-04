@@ -31,12 +31,15 @@ $upd = $pdo->prepare('UPDATE orders SET lat = ?, lon = ? WHERE id = ?');
 $ok = 0;
 $fail = 0;
 $errors = [];
+$providers = [];
 
 foreach ($rows as $row) {
     $meta = Geocoder::geocodeWithMeta($row['address'], $yandexKey, $dadataToken);
     if ($meta['point']) {
         $upd->execute([$meta['point']['lat'], $meta['point']['lon'], $row['id']]);
         $ok++;
+        $p = $meta['provider'] ?? '?';
+        $providers[$p] = ($providers[$p] ?? 0) + 1;
     } else {
         $fail++;
         if (count($errors) < 5) {
@@ -47,8 +50,10 @@ foreach ($rows as $row) {
             ];
         }
     }
-    // Pace: Nominatim просит не чаще ~1 запроса/сек
-    usleep(1100000);
+    // Пауза только для бесплатных OSM-провайдеров (Nominatim/Photon) из-за их лимитов
+    if (in_array($meta['provider'] ?? '', ['nominatim', 'photon'], true)) {
+        usleep(1100000);
+    }
 }
 
 echo json_encode([
@@ -56,5 +61,6 @@ echo json_encode([
     'geocoded' => $ok,
     'failed' => $fail,
     'left_batch' => count($rows),
+    'providers' => $providers,
     'sample_errors' => $errors,
 ], JSON_UNESCAPED_UNICODE);

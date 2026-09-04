@@ -278,42 +278,56 @@ if (typeof ymaps !== 'undefined') {
       geoBtn.addEventListener('click', async () => {
         geoBtn.disabled = true;
         geoBtn.textContent = 'Геокодинг…';
+        const lines = [];
+        const providers = {};
+        const errs = [];
+        let totalOk = 0;
+        let totalFail = 0;
         try {
-          const r = await fetch('api/geocode_front.php?date=<?= urlencode($date) ?>', { method: 'POST' });
-          const text = await r.text();
-          let data;
-          try {
-            data = JSON.parse(text);
-          } catch (e) {
-            showGeoLog([
-              'Сервер вернул не JSON (возможно, защита хостинга «Подтвердите действие» или ошибка PHP).',
-              'Повторите через несколько секунд.',
-              '',
-              'Ответ:',
-              text.slice(0, 500),
-            ]);
-            geoBtn.disabled = false;
-            geoBtn.textContent = 'Геокод с карты';
-            return;
+          for (let iter = 0; iter < 200; iter++) {
+            const r = await fetch('api/geocode_front.php?date=<?= urlencode($date) ?>', { method: 'POST' });
+            const text = await r.text();
+            let data;
+            try {
+              data = JSON.parse(text);
+            } catch (e) {
+              showGeoLog([
+                'Сервер вернул не JSON (возможно, защита хостинга «Подтвердите действие» или ошибка PHP).',
+                'Повторите через несколько секунд.',
+                '',
+                'Ответ:',
+                text.slice(0, 500),
+              ]);
+              geoBtn.disabled = false;
+              geoBtn.textContent = 'Геокод с карты';
+              return;
+            }
+            totalOk += data.geocoded || 0;
+            totalFail += data.failed || 0;
+            if (data.sample_errors && data.sample_errors.length) errs.push.apply(errs, data.sample_errors);
+            if (data.providers) {
+              for (var k in data.providers) providers[k] = (providers[k] || 0) + data.providers[k];
+            }
+            if (!data.left_batch || data.left_batch < 1) break;           // больше нечего обрабатывать
+            if ((data.geocoded || 0) === 0 && (data.failed || 0) > 0) break; // дальше только «не находятся»
+            geoBtn.textContent = 'Геокодинг… ' + (iter + 1) + '/200';
           }
-          const done = data.geocoded || 0;
-          const failed = data.failed || 0;
-          const lines = [done + ' добавлено, ' + failed + ' не найдено.'];
-          if (failed && data.sample_errors && data.sample_errors.length) {
+          lines.push('Итого добавлено: ' + totalOk + ', не найдено: ' + totalFail + '.');
+          const provLines = Object.keys(providers).map(function (k) { return k + ': ' + providers[k]; }).join(', ');
+          if (provLines) lines.push('Провайдеры: ' + provLines);
+          if (errs.length) {
             lines.push('');
             lines.push('Не найдены:');
-            data.sample_errors.forEach(function (e) {
+            errs.slice(0, 20).forEach(function (e) {
               lines.push((e.address || '') + '\t' + (e.error || ''));
             });
           }
           showGeoLog(lines);
-          geoBtn.disabled = false;
-          geoBtn.textContent = 'Геокод с карты';
         } catch (e) {
           showGeoLog([e.message]);
-          geoBtn.disabled = false;
-          geoBtn.textContent = 'Геокод с карты';
         }
+        geoBtn.disabled = false;
+        geoBtn.textContent = 'Геокод с карты';
       });
     }
   });
