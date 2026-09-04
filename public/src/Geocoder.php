@@ -2,11 +2,13 @@
 
 class Geocoder
 {
-    // Примерно Ростовская область (+ небольшой запас)
-    private const LAT_MIN = 46.2;
-    private const LAT_MAX = 48.0;
-    private const LON_MIN = 38.0;
-    private const LON_MAX = 43.5;
+    // Зона доставки по загруженным заявкам: Ростовская область + ДНР + ЛНР.
+    // Юго-запад: lat 46–49, lon 36.8–41.5. Позволяет отсечь одноимённые
+    // посёлки (Шахты, Горный, Свердловск и т.п.) на Урале/в Сибири/на Дальнем Востоке.
+    private const LAT_MIN = 46.0;
+    private const LAT_MAX = 49.0;
+    private const LON_MIN = 36.8;
+    private const LON_MAX = 41.5;
 
     public static function geocode(string $address, string $yandexKey = ''): ?array
     {
@@ -22,7 +24,8 @@ class Geocoder
         }
 
         if ($yandexKey !== '') {
-            $y = self::yandex($address . ', Ростовская область, Россия', $yandexKey);
+            $isDnrLnr = (bool) preg_match('/Народная Республика|Народная респ|ДНР|ЛНР/iu', $address);
+            $y = self::yandex($isDnrLnr ? $address : $address . ', Ростовская область, Россия', $yandexKey);
             if ($y['point'] && self::inRegion($y['point']['lat'], $y['point']['lon'])) {
                 return ['point' => $y['point'], 'error' => null, 'provider' => 'yandex'];
             }
@@ -98,8 +101,14 @@ class Geocoder
             $variants[] = $a . ', Ростовская область, Россия';
         }
 
-        $variants[] = $a . ', Ростовская область, Россия';
-        $variants[] = $a;
+        // Для адресов ДНР/ЛНР не приписываем «Ростовская область», иначе
+        // Nominatim ищет их в неверном регионе и не находит.
+        if (preg_match('/Народная Республика|Народная респ|ДНР|ЛНР/iu', $a)) {
+            $variants[] = $a;
+        } else {
+            $variants[] = $a . ', Ростовская область, Россия';
+            $variants[] = $a;
+        }
 
         $out = [];
         foreach ($variants as $v) {
@@ -119,7 +128,7 @@ class Geocoder
             'format' => 'json',
             'results' => 1,
             'lang' => 'ru_RU',
-            'bbox' => '38.0,46.2~43.5,48.0',
+            'bbox' => sprintf('%s,%s~%s,%s', self::LON_MIN, self::LAT_MIN, self::LON_MAX, self::LAT_MAX),
             'rspn' => 1,
         ]);
 
@@ -149,8 +158,8 @@ class Geocoder
             'q' => $address,
             'format' => 'json',
             'limit' => 3,
-            'countrycodes' => 'ru',
-            'viewbox' => '38.0,48.0,43.5,46.2',
+            'countrycodes' => 'ru,ua',
+            'viewbox' => sprintf('%s,%s,%s,%s', self::LON_MIN, self::LAT_MAX, self::LON_MAX, self::LAT_MIN),
             'bounded' => 1,
         ]);
 
