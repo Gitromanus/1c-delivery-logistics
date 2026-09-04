@@ -25,7 +25,7 @@ jobs:
         password: ${{ secrets.FTP_PASSWORD }}
         # Берем только содержимое папки public из репозитория:
         local-dir: ./public/
-        # Точка на конце указывает, что путь считается от корня FTP-аккаунта
+        # Точка на конце указывает, что путь считается от корня FTP-аккаунта 1
         server-dir: ./
         protocol: ftps
         exclude: |
