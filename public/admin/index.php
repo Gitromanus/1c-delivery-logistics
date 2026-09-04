@@ -220,9 +220,30 @@ foreach ($zonePolys as $zp) {
 <script>
 const zpPolyMap = <?= json_encode($polyMap, JSON_UNESCAPED_UNICODE) ?>;
 let zpMap = null, zpPolygon = null, zpEditorActive = false;
+let zpGhosts = []; // силуэты остальных зон
 
 function zpZoneId() { return parseInt(document.getElementById('zpZone').value, 10); }
 function zpZoneColor() { return document.getElementById('zpColor').value; }
+
+// Силуэты всех зон (кроме текущей), чтобы видеть границы соседей при рисовании
+function zpRenderGhosts(excludeId) {
+  zpGhosts.forEach(function (g) { try { zpMap.geoObjects.remove(g); } catch (e) {} });
+  zpGhosts = [];
+  Object.keys(zpPolyMap).forEach(function (zid) {
+    const id = parseInt(zid, 10);
+    if (excludeId && id === excludeId) return;
+    const zp = zpPolyMap[zid];
+    if (!zp.points || !zp.points.length) return;
+    const color = zp.color || '#1a73e8';
+    const g = new ymaps.Polygon([zp.points], { hintContent: 'Зона #' + id }, {
+      fillColor: color, fillOpacity: 0.06,
+      strokeColor: color, strokeWidth: 1.5, strokeOpacity: 0.5,
+      strokeStyle: 'dash'
+    });
+    zpMap.geoObjects.add(g);
+    zpGhosts.push(g);
+  });
+}
 
 function zpStopEditing() {
   if (zpPolygon && zpEditorActive) { try { zpPolygon.editor.stopEditing(); } catch (e) {} zpEditorActive = false; }
@@ -245,7 +266,8 @@ function zpLoad(zoneId) {
 ymaps.ready(function () {
   zpMap = new ymaps.Map('zpMap', { center: [47.411, 40.091], zoom: 9, controls: ['zoomControl', 'typeSelector'] });
 
-  document.getElementById('zpZone').addEventListener('change', function () { zpStopEditing(); zpLoad(zpZoneId()); });
+  document.getElementById('zpZone').addEventListener('change', function () { zpStopEditing(); zpRenderGhosts(zpZoneId()); zpLoad(zpZoneId()); });
+  zpRenderGhosts(zpZoneId());
   zpLoad(zpZoneId());
 
   document.getElementById('zpDraw').addEventListener('click', function () {
@@ -278,6 +300,7 @@ ymaps.ready(function () {
       const d = await r.json();
       if (!d.ok) throw new Error(d.error || 'error');
       zpPolyMap[zpZoneId()] = { points: pts, color: zpZoneColor() };
+      zpRenderGhosts(zpZoneId());
       st.textContent = 'Сохранено (' + pts.length + ' точек)';
     } catch (e) { alert('Ошибка: ' + e.message); st.textContent = ''; }
   });
@@ -291,6 +314,7 @@ ymaps.ready(function () {
       if (!d.ok) throw new Error(d.error || 'error');
       delete zpPolyMap[zpZoneId()];
       if (zpPolygon) { zpMap.geoObjects.remove(zpPolygon); zpPolygon = null; }
+      zpRenderGhosts(zpZoneId());
       st.textContent = 'Удалено';
     } catch (e) { alert('Ошибка: ' + e.message); st.textContent = ''; }
   });
