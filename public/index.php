@@ -244,33 +244,15 @@ if (typeof ymaps !== 'undefined') {
       geoBtn.addEventListener('click', async () => {
         geoBtn.disabled = true;
         geoBtn.textContent = 'Геокодинг…';
-        const saved = [];
-        for (let i = 0; i < needGeo.length; i++) {
-          const o = needGeo[i];
-          try {
-            const res = await ymaps.geocode(o.address, { results: 1 });
-            const obj = res.geoObjects.get(0);
-            if (!obj) continue;
-            const c = obj.geometry.getCoordinates(); // [lat, lon]
-            o.lat = c[0];
-            o.lon = c[1];
-            saved.push({ id: o.id, lat: c[0], lon: c[1] });
-          } catch (e) {
-            console.warn(o.address, e);
-          }
-          geoBtn.textContent = 'Геокодинг… ' + (i + 1) + '/' + needGeo.length;
-        }
-        if (saved.length) {
-          await fetch('api/save_coords.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ items: saved })
-          });
-          addMarks(map, needGeo);
-          alert('Сохранено координат: ' + saved.length);
+        try {
+          const r = await fetch('api/geocode_front.php?date=<?= urlencode($date) ?>', { method: 'POST' });
+          const data = await r.json();
+          const done = data.geocoded || 0;
+          const failed = data.failed || 0;
+          alert(done + ' добавлено, ' + failed + ' не найдено' + (failed ? '. Запустите ещё раз.' : '.'));
           location.reload();
-        } else {
-          alert('Не удалось геокодировать. Проверьте ключ JS API и адреса.');
+        } catch (e) {
+          alert(e.message);
           geoBtn.disabled = false;
           geoBtn.textContent = 'Геокод с карты';
         }
