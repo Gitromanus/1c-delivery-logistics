@@ -156,12 +156,15 @@ function h(?string $s): string
         <div id="unassignedZone">
           <?php foreach ($freeOrders as $o): ?>
             <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="" draggable="true"
-                 style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid #e4e7ec;border-radius:8px;margin-bottom:6px;background:#fff;cursor:grab;box-shadow:0 1px 2px rgba(16,24,40,.05)">
+                 style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #cfd4dc;border-radius:8px;margin-bottom:6px;background:#f2f4f7;cursor:grab;box-shadow:0 1px 2px rgba(16,24,40,.08)">
               <div style="min-width:0;flex:1">
-                <div style="font-weight:600;font-size:13px;line-height:1.2"><?= h($o['number'] ?: $o['external_id']) ?></div>
-                <div style="font-size:12px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= h($o['address']) ?></div>
+                <div style="font-weight:700;font-size:14px;color:#101828;line-height:1.25"><?= h($o['number'] ?: $o['external_id']) ?></div>
+                <div style="font-size:12px;color:#475467;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= h($o['address']) ?></div>
+                <?php if (!empty($o['partner'])): ?>
+                <div style="font-size:12px;color:#344054;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px"><?= h($o['partner']) ?></div>
+                <?php endif; ?>
               </div>
-              <span style="flex:0 0 auto;font-size:12px;font-weight:600;background:#eef2ff;color:#3538cd;border-radius:20px;padding:2px 10px"><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?> кг</span>
+              <span style="flex:0 0 auto;font-size:12px;font-weight:700;background:#101828;color:#fff;border-radius:20px;padding:3px 10px"><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?> кг</span>
             </div>
           <?php endforeach; ?>
         </div>
@@ -189,12 +192,15 @@ function h(?string $s): string
           <div style="margin-top:8px">
             <?php foreach ($list as $o): ?>
               <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="<?= (int) $t['id'] ?>" draggable="true"
-                   style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid #e4e7ec;border-radius:8px;margin-bottom:6px;background:#fff;cursor:grab;box-shadow:0 1px 2px rgba(16,24,40,.05)">
+                   style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #cfd4dc;border-radius:8px;margin-bottom:6px;background:#f2f4f7;cursor:grab;box-shadow:0 1px 2px rgba(16,24,40,.08)">
                 <div style="min-width:0;flex:1">
-                  <div style="font-weight:600;font-size:13px;line-height:1.2"><?= h($o['number'] ?: $o['external_id']) ?></div>
-                  <div style="font-size:12px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= h($o['address']) ?></div>
+                  <div style="font-weight:700;font-size:14px;color:#101828;line-height:1.25"><?= h($o['number'] ?: $o['external_id']) ?></div>
+                  <div style="font-size:12px;color:#475467;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= h($o['address']) ?></div>
+                  <?php if (!empty($o['partner'])): ?>
+                  <div style="font-size:12px;color:#344054;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px"><?= h($o['partner']) ?></div>
+                  <?php endif; ?>
                 </div>
-                <span style="flex:0 0 auto;font-size:12px;font-weight:600;background:#eef2ff;color:#3538cd;border-radius:20px;padding:2px 10px"><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?> кг</span>
+                <span style="flex:0 0 auto;font-size:12px;font-weight:700;background:#101828;color:#fff;border-radius:20px;padding:3px 10px"><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?> кг</span>
               </div>
             <?php endforeach; ?>
           </div>
