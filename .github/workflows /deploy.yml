@@ -1,0 +1,34 @@
+name: Deploy to Beget via FTPS
+
+on:
+  push:
+    branches:
+      - main  # Если ваша главная ветка называется master, замените main на master
+
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
+jobs:
+  web-deploy:
+    name: FTPS Deployment
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Get latest code
+      uses: actions/checkout@v4
+
+    - name: Sync files via FTPS
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        # Берем только содержимое папки public из репозитория:
+        local-dir: ./public/
+        # Точка на конце указывает, что путь считается от корня FTP-аккаунта
+        server-dir: ./
+        protocol: ftps
+        exclude: |
+          **/.git*
+          **/.git*/**
+          **/.github*/**
