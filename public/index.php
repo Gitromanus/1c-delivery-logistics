@@ -156,9 +156,9 @@ function h(?string $s): string
       <?php else: ?>
         <table>
           <thead><tr><th>№</th><th>Адрес</th><th>Кг</th></tr></thead>
-          <tbody>
+          <tbody id="unassignedZone">
           <?php foreach ($freeOrders as $o): ?>
-            <tr>
+            <tr class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="" draggable="true">
               <td><?= h($o['number'] ?: $o['external_id']) ?></td>
               <td><?= h(mb_strimwidth($o['address'], 0, 48, '…', 'UTF-8')) ?></td>
               <td><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?></td>
@@ -182,14 +182,14 @@ function h(?string $s): string
           $pct = $cap > 0 ? min(100, round($sum / $cap * 100)) : 0;
           $over = $sum > $cap + 0.01;
           ?>
-        <div class="trip">
+        <div class="trip" data-trip-id="<?= (int) $t['id'] ?>">
           <div class="title"><?= h($t['vehicle_name']) ?><?= $t['plate'] ? ' · ' . h($t['plate']) : '' ?></div>
           <div class="muted"><?= h($t['zone_name'] ?: 'Зона не указана') ?> · <?= h($t['status']) ?></div>
           <div class="bar <?= $over ? 'over' : '' ?>"><i style="width:<?= $pct ?>%"></i></div>
           <div class="muted"><?= number_format($sum, 0, '.', ' ') ?> / <?= number_format($cap, 0, '.', ' ') ?> кг</div>
           <table style="margin-top:8px">
             <?php foreach ($list as $o): ?>
-              <tr>
+              <tr class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="<?= (int) $t['id'] ?>" draggable="true">
                 <td><?= h($o['number'] ?: $o['external_id']) ?></td>
                 <td><?= h(mb_strimwidth($o['address'], 0, 40, '…', 'UTF-8')) ?></td>
                 <td><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?></td>
@@ -278,6 +278,50 @@ document.getElementById('rezoneBtn').addEventListener('click', async () => {
   }
 });
 
+// Drag & drop заявок между рейсами и «нераспределёнными»
+let dragOrder = null;
+document.addEventListener('dragstart', function (e) {
+  const tr = e.target.closest('.drag-order');
+  if (!tr) { dragOrder = null; return; }
+  dragOrder = {
+    order_id: parseInt(tr.getAttribute('data-order-id'), 10),
+    from_trip: tr.getAttribute('data-from-trip') || null
+  };
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(dragOrder.order_id));
+});
+document.addEventListener('dragover', function (e) {
+  const trip = e.target.closest('[data-trip-id]');
+  const un = e.target.closest('#unassignedZone');
+  if (trip || un) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+});
+document.addEventListener('drop', async function (e) {
+  const trip = e.target.closest('[data-trip-id]');
+  const un = e.target.closest('#unassignedZone');
+  if (!dragOrder) return;
+  e.preventDefault();
+  const orderId = dragOrder.order_id;
+  const fromTrip = dragOrder.from_trip;
+  dragOrder = null;
+  try {
+    let params;
+    if (trip) {
+      const toTrip = parseInt(trip.getAttribute('data-trip-id'), 10);
+      if (fromTrip && parseInt(fromTrip, 10) === toTrip) return;
+      params = { action: fromTrip ? 'move' : 'add', order_id: orderId, from_trip_id: fromTrip, to_trip_id: toTrip };
+    } else if (un) {
+      if (!fromTrip) return;
+      params = { action: 'remove', order_id: orderId, trip_id: parseInt(fromTrip, 10) };
+    } else {
+      return;
+    }
+    const r = await fetch('api/trip_order.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(params) });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'error');
+    location.reload();
+  } catch (err) { alert(err.message); }
+});
+
 function addMarks(map, points) {
   const withCoords = (points || []).filter(p => p.lat && p.lon);
   if (!withCoords.length) return null;
@@ -364,7 +408,16 @@ if (typeof ymaps !== 'undefined') {
             if ((data.geocoded || 0) === 0 && (data.failed || 0) > 0) break; // дальше только «не находятся»
             geoBtn.textContent = 'Геокодинг… ' + (iter + 1) + '/200';
           }
+          // Пересчёт зон по новым координатам после геокодинга
+          let rzInfo = '';
+          try {
+            const rz = await fetch('api/reassign_zones.php?date=<?= urlencode($date) ?>', { method: 'POST' });
+            const rzd = await rz.json();
+            rzInfo = 'Зоны: обновлено ' + (rzd.updated || 0) + ', очищено ' + (rzd.cleared || 0);
+          } catch (e) {}
+
           lines.push('Итого добавлено: ' + totalOk + ', не найдено: ' + totalFail + '.');
+          if (rzInfo) lines.push(rzInfo);
           const provLines = Object.keys(providers).map(function (k) { return k + ': ' + providers[k]; }).join(', ');
           if (provLines) lines.push('Провайдеры: ' + provLines);
           if (errs.length) {
