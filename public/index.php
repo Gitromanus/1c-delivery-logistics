@@ -9,7 +9,13 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
     $date = date('Y-m-d');
 }
 
-$zones = $pdo->query('SELECT * FROM zones WHERE is_active = 1 ORDER BY sort_order, name')->fetchAll();
+$zones = $pdo->query(
+    "SELECT z.*, zp.color AS poly_color
+     FROM zones z
+     LEFT JOIN zone_polygons zp ON zp.zone_id = z.id
+     WHERE z.is_active = 1
+     ORDER BY z.sort_order, z.name"
+)->fetchAll();
 
 $statsStmt = $pdo->prepare(
     "SELECT zone_id,
@@ -114,9 +120,10 @@ function h(?string $s): string
           $st = $stats[$z['id']] ?? ['cnt' => 0, 'weight' => 0];
           $cnt = (int) $st['cnt'];
           $w = (float) $st['weight'];
+          $zcolor = !empty($z['poly_color']) ? $z['poly_color'] : '#1a73e8';
           ?>
-        <div class="zone-card">
-          <div class="name"><?= h($z['name']) ?></div>
+        <div class="zone-card" style="border-left:6px solid <?= h($zcolor) ?>">
+          <div class="name"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:<?= h($zcolor) ?>;margin-right:6px;vertical-align:middle"></span><?= h($z['name']) ?></div>
           <div class="meta"><?= $cnt ?> заявок · <?= number_format($w, 0, '.', ' ') ?> кг</div>
           <?php if ($cnt === 0): ?>
             <span class="badge badge-ok">Пусто</span>

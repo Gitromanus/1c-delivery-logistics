@@ -75,7 +75,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
-$zones = $pdo->query('SELECT * FROM zones ORDER BY sort_order, name')->fetchAll();
+$zones = $pdo->query(
+    "SELECT z.*, zp.color AS poly_color
+     FROM zones z
+     LEFT JOIN zone_polygons zp ON zp.zone_id = z.id
+     ORDER BY z.sort_order, z.name"
+)->fetchAll();
 $vehicles = $pdo->query('SELECT * FROM vehicles ORDER BY name')->fetchAll();
 $binds = $pdo->query(
     'SELECT vz.*, v.name AS vname, z.name AS zname FROM vehicle_zones vz
@@ -124,7 +129,7 @@ foreach ($zonePolys as $zp) {
         <tr><th>Название</th><th>Ключевые слова</th></tr>
         <?php foreach ($zones as $z): ?>
           <tr>
-            <td><?= htmlspecialchars($z['name']) ?></td>
+            <td><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:<?= htmlspecialchars(!empty($z['poly_color']) ? $z['poly_color'] : '#ccc') ?>;margin-right:6px;vertical-align:middle"></span><?= htmlspecialchars($z['name']) ?></td>
             <td class="muted"><?= htmlspecialchars((string) $z['keywords']) ?></td>
           </tr>
         <?php endforeach; ?>
