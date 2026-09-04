@@ -6,7 +6,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 $config = require (defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__)) . '/config.php';
 $apiKey = (string) ($config['api_key'] ?? '');
-$yandexKey = (string) ($config['yandex_maps_key'] ?? '');
+$yandexKey = (string) ($config['yandex_geocoder_key'] ?? ($config['yandex_maps_key'] ?? ''));
 
 $given = $_SERVER['HTTP_X_API_KEY'] ?? ($_POST['api_key'] ?? '');
 if ($apiKey === '' || !hash_equals($apiKey, (string) $given)) {
