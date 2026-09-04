@@ -82,6 +82,16 @@ $binds = $pdo->query(
      JOIN vehicles v ON v.id = vz.vehicle_id
      JOIN zones z ON z.id = vz.zone_id'
 )->fetchAll();
+
+// Полигоны зон
+$zonePolys = $pdo->query('SELECT zone_id, polygon, color FROM zone_polygons')->fetchAll();
+$polyMap = [];
+foreach ($zonePolys as $zp) {
+    $polyMap[(int) $zp['zone_id']] = [
+        'points' => json_decode((string) $zp['polygon'], true) ?: [],
+        'color' => (string) ($zp['color'] ?? ''),
+    ];
+}
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -89,6 +99,9 @@ $binds = $pdo->query(
   <meta charset="UTF-8">
   <title>Админка логистики</title>
   <link rel="stylesheet" href="../assets/css/style.css">
+  <?php if (!empty($config['yandex_maps_key'])): ?>
+  <script src="https://api-maps.yandex.ru/2.1/?apikey=<?= htmlspecialchars($config['yandex_maps_key']) ?>&lang=ru_RU"></script>
+  <?php endif; ?>
 </head>
 <body>
 <div class="app">
@@ -174,6 +187,116 @@ $binds = $pdo->query(
       <button class="btn btn-primary" type="submit">Привязать</button>
     </form>
   </section>
+
+  <section class="panel" style="margin-top:16px">
+    <h2>Полигоны зон</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
+      <label class="muted">Зона</label>
+      <select id="zpZone">
+        <?php foreach ($zones as $z): ?>
+          <option value="<?= (int) $z['id'] ?>"><?= htmlspecialchars($z['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <input type="color" id="zpColor" value="#1a73e8" title="Цвет">
+      <button class="btn btn-primary" type="button" id="zpDraw">Рисовать заново</button>
+      <button class="btn btn-ghost" type="button" id="zpEdit">Редактировать</button>
+      <button class="btn btn-ghost" type="button" id="zpSave">Сохранить</button>
+      <button class="btn btn-ghost" type="button" id="zpDelete">Удалить</button>
+      <span class="muted" id="zpStatus"></span>
+    </div>
+    <?php if (empty($config['yandex_maps_key'])): ?>
+      <p class="muted">Укажите <code>yandex_maps_key</code> в config.php</p>
+    <?php else: ?>
+      <div id="zpMap" class="map-box" style="height:480px"></div>
+      <p class="muted" style="margin-top:8px">
+        Выберите зону → «Рисовать заново»: кликами ставьте вершины, двойной клик завершает → «Сохранить».
+        «Редактировать» правит существующий полигон.
+      </p>
+    <?php endif; ?>
+  </section>
 </div>
+
+<?php if (!empty($config['yandex_maps_key'])): ?>
+<script>
+const zpPolyMap = <?= json_encode($polyMap, JSON_UNESCAPED_UNICODE) ?>;
+let zpMap = null, zpPolygon = null, zpEditorActive = false;
+
+function zpZoneId() { return parseInt(document.getElementById('zpZone').value, 10); }
+function zpZoneColor() { return document.getElementById('zpColor').value; }
+
+function zpStopEditing() {
+  if (zpPolygon && zpEditorActive) { try { zpPolygon.editor.stopEditing(); } catch (e) {} zpEditorActive = false; }
+}
+
+function zpLoad(zoneId) {
+  if (zpPolygon) { zpMap.geoObjects.remove(zpPolygon); zpPolygon = null; }
+  const saved = zpPolyMap[zoneId];
+  const pts = (saved && saved.points) ? saved.points : [];
+  const color = (saved && saved.color) ? saved.color : zpZoneColor();
+  if (pts.length) {
+    zpPolygon = new ymaps.Polygon([pts], {}, {
+      fillColor: color, fillOpacity: 0.15, strokeColor: color, strokeWidth: 2
+    });
+    zpMap.geoObjects.add(zpPolygon);
+    try { zpMap.setBounds(zpPolygon.geometry.getBounds(), { checkZoomRange: true, zoomMargin: 20 }); } catch (e) {}
+  }
+}
+
+ymaps.ready(function () {
+  zpMap = new ymaps.Map('zpMap', { center: [47.411, 40.091], zoom: 9, controls: ['zoomControl', 'typeSelector'] });
+
+  document.getElementById('zpZone').addEventListener('change', function () { zpStopEditing(); zpLoad(zpZoneId()); });
+  zpLoad(zpZoneId());
+
+  document.getElementById('zpDraw').addEventListener('click', function () {
+    zpStopEditing();
+    if (zpPolygon) { zpMap.geoObjects.remove(zpPolygon); zpPolygon = null; }
+    zpPolygon = new ymaps.Polygon([[]]);
+    zpMap.geoObjects.add(zpPolygon);
+    zpEditorActive = true;
+    zpPolygon.editor.startDrawing();
+    zpPolygon.editor.events.once('drawingstop', function () { zpEditorActive = false; });
+  });
+
+  document.getElementById('zpEdit').addEventListener('click', function () {
+    zpStopEditing();
+    if (zpPolygon) { zpEditorActive = true; zpPolygon.editor.startEditing(); }
+  });
+
+  document.getElementById('zpSave').addEventListener('click', async function () {
+    if (!zpPolygon) { alert('Сначала нарисуйте полигон'); return; }
+    zpStopEditing();
+    let rings;
+    try { rings = zpPolygon.geometry.getCoordinates(); } catch (e) { rings = null; }
+    const pts = (rings && rings[0]) ? rings[0] : [];
+    if (pts.length < 3) { alert('Мало точек'); return; }
+    const st = document.getElementById('zpStatus');
+    const body = JSON.stringify({ zone_id: zpZoneId(), polygon: pts, color: zpZoneColor(), action: 'save' });
+    st.textContent = 'Сохранение…';
+    try {
+      const r = await fetch('../api/save_zone_polygon.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error || 'error');
+      zpPolyMap[zpZoneId()] = { points: pts, color: zpZoneColor() };
+      st.textContent = 'Сохранено (' + pts.length + ' точек)';
+    } catch (e) { alert('Ошибка: ' + e.message); st.textContent = ''; }
+  });
+
+  document.getElementById('zpDelete').addEventListener('click', async function () {
+    const st = document.getElementById('zpStatus');
+    if (!confirm('Удалить полигон этой зоны?')) return;
+    try {
+      const r = await fetch('../api/save_zone_polygon.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ zone_id: zpZoneId(), action: 'delete' }) });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error || 'error');
+      delete zpPolyMap[zpZoneId()];
+      if (zpPolygon) { zpMap.geoObjects.remove(zpPolygon); zpPolygon = null; }
+      st.textContent = 'Удалено';
+    } catch (e) { alert('Ошибка: ' + e.message); st.textContent = ''; }
+  });
+});
+</script>
+<?php endif; ?>
+
 </body>
 </html>

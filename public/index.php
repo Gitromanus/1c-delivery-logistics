@@ -65,6 +65,12 @@ $mapOrders = $pdo->prepare(
 $mapOrders->execute([$date]);
 $mapPoints = $mapOrders->fetchAll();
 
+// Полигоны зон для отрисовки на карте
+$zonePolys = $pdo->query(
+    "SELECT zp.zone_id, zp.polygon, zp.color, z.name AS zone_name
+     FROM zone_polygons zp JOIN zones z ON z.id = zp.zone_id"
+)->fetchAll();
+
 $needGeo = array_values(array_filter($mapPoints, function ($p) {
     return empty($p['lat']) || empty($p['lon']);
 }));
@@ -204,6 +210,14 @@ function h(?string $s): string
 <script>
 const mapPoints = <?= json_encode($mapPoints, JSON_UNESCAPED_UNICODE) ?>;
 const needGeo = <?= json_encode($needGeo, JSON_UNESCAPED_UNICODE) ?>;
+const zonePolys = <?= json_encode(array_map(function ($p) {
+    return [
+        'zone_id' => (int) $p['zone_id'],
+        'zone_name' => $p['zone_name'],
+        'color' => (string) ($p['color'] ?? ''),
+        'points' => json_decode((string) $p['polygon'], true) ?: [],
+    ];
+}, $zonePolys), JSON_UNESCAPED_UNICODE) ?>;
 
 // Окно результатов геокодирования (можно скопировать)
 function showGeoLog(lines) {
@@ -262,6 +276,21 @@ function addMarks(map, points) {
   return collection;
 }
 
+function drawZones(map) {
+  (zonePolys || []).forEach(function (zp) {
+    if (!zp.points || !zp.points.length) return;
+    const color = zp.color || '#1a73e8';
+    const poly = new ymaps.Polygon([zp.points], { hintContent: zp.zone_name }, {
+      fillColor: color,
+      fillOpacity: 0.10,
+      strokeColor: color,
+      strokeWidth: 2,
+      strokeOpacity: 0.75
+    });
+    map.geoObjects.add(poly);
+  });
+}
+
 <?php if ($yandexKey !== ''): ?>
 if (typeof ymaps !== 'undefined') {
   ymaps.ready(function () {
@@ -272,6 +301,7 @@ if (typeof ymaps !== 'undefined') {
     });
     window.__logisticsMap = map;
     addMarks(map, mapPoints);
+    drawZones(map);
 
     const geoBtn = document.getElementById('geocodeBtn');
     if (geoBtn && needGeo.length) {
