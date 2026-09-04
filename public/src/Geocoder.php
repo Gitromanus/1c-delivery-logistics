@@ -2,6 +2,12 @@
 
 class Geocoder
 {
+    // Примерно Ростовская область (+ небольшой запас)
+    private const LAT_MIN = 46.2;
+    private const LAT_MAX = 48.0;
+    private const LON_MIN = 38.0;
+    private const LON_MAX = 43.5;
+
     public static function geocode(string $address, string $yandexKey = ''): ?array
     {
         $meta = self::geocodeWithMeta($address, $yandexKey);
@@ -16,62 +22,85 @@ class Geocoder
         }
 
         if ($yandexKey !== '') {
-            $y = self::yandex($address . ', Россия', $yandexKey);
-            if ($y['point']) {
+            $y = self::yandex($address . ', Ростовская область, Россия', $yandexKey);
+            if ($y['point'] && self::inRegion($y['point']['lat'], $y['point']['lon'])) {
                 return ['point' => $y['point'], 'error' => null, 'provider' => 'yandex'];
             }
-            $yandexError = $y['error'];
+            $yandexError = $y['error'] ?? 'out of region';
         } else {
             $yandexError = null;
         }
 
         foreach (self::queryVariants($address) as $q) {
             $osm = self::nominatim($q);
-            if ($osm['point']) {
+            if ($osm['point'] && self::inRegion($osm['point']['lat'], $osm['point']['lon'])) {
                 return ['point' => $osm['point'], 'error' => null, 'provider' => 'nominatim'];
             }
-            usleep(400000);
+            usleep(350000);
+        }
+
+        // Запасные «центры» известных зон из тестовых адресов (лучше далеко не ставить)
+        $fallback = self::zoneFallback($address);
+        if ($fallback) {
+            return ['point' => $fallback, 'error' => null, 'provider' => 'fallback_zone'];
         }
 
         return [
             'point' => null,
-            'error' => trim(($yandexError ? "yandex: $yandexError; " : '') . 'osm: no results'),
+            'error' => trim(($yandexError ? "yandex: $yandexError; " : '') . 'osm: no results in region'),
             'provider' => null,
         ];
     }
 
-    /** Несколько формулировок — посёлки OSM знает хуже, чем города */
+    public static function inRegion(float $lat, float $lon): bool
+    {
+        return $lat >= self::LAT_MIN && $lat <= self::LAT_MAX
+            && $lon >= self::LON_MIN && $lon <= self::LON_MAX;
+    }
+
+    private static function zoneFallback(string $address): ?array
+    {
+        // Центры посёлков около Новочеркасска (приблизительно)
+        $map = [
+            'молод' => ['lat' => 47.5185, 'lon' => 40.0975],
+            'донск' => ['lat' => 47.4250, 'lon' => 40.0450],
+            'новочеркас' => ['lat' => 47.4110, 'lon' => 40.0910],
+            'шахт' => ['lat' => 47.7085, 'lon' => 40.2150],
+        ];
+        $lower = mb_strtolower($address, 'UTF-8');
+        foreach ($map as $needle => $point) {
+            if (mb_strpos($lower, $needle) !== false) {
+                return $point;
+            }
+        }
+        return null;
+    }
+
     private static function queryVariants(string $address): array
     {
         $a = preg_replace('/\s+/u', ' ', trim($address));
-        $variants = [$a];
+        $variants = [];
 
-        // Без «пос.» / «п.»
-        $variants[] = preg_replace('/\b(пос\.?|п\.|посёлок|поселок)\s+/ui', '', $a);
-
-        // Только населённый пункт + область
-        if (preg_match('/Молод[её]жн\w*/ui', $a, $m)) {
-            $variants[] = 'посёлок Молодёжный Октябрьский район Ростовская область';
-            $variants[] = 'Молодёжный Ростовская область';
+        if (preg_match('/Молод[её]жн\w*/ui', $a)) {
+            $variants[] = 'Молодёжный, Октябрьский район, Ростовская область, Россия';
+            $variants[] = 'poselok Molodezhny, Rostov Oblast';
         }
-        if (preg_match('/Донск\w*/ui', $a, $m)) {
-            $variants[] = 'посёлок Донской Октябрьский район Ростовская область';
-            $variants[] = 'Донской Ростовская область';
+        if (preg_match('/Донск\w*/ui', $a)) {
+            $variants[] = 'Донской, Октябрьский район, Ростовская область, Россия';
         }
         if (preg_match('/Новочеркасск/ui', $a)) {
-            $variants[] = $a . ', Ростовская область';
-            // улица + город
+            $variants[] = $a . ', Ростовская область, Россия';
             if (preg_match('/(ул\.?|улица|пр\.?|проспект|пер\.?|переулок)\s*([^,]+)/ui', $a, $um)) {
-                $variants[] = trim($um[0]) . ', Новочеркасск, Ростовская область';
+                $variants[] = trim($um[0]) . ', Новочеркасск, Ростовская область, Россия';
             }
         }
         if (preg_match('/Шахт/ui', $a)) {
-            $variants[] = $a . ', Ростовская область';
+            $variants[] = $a . ', Ростовская область, Россия';
         }
 
         $variants[] = $a . ', Ростовская область, Россия';
+        $variants[] = $a;
 
-        // уникальные
         $out = [];
         foreach ($variants as $v) {
             $v = trim(preg_replace('/\s+/u', ' ', $v));
@@ -90,6 +119,8 @@ class Geocoder
             'format' => 'json',
             'results' => 1,
             'lang' => 'ru_RU',
+            'bbox' => '38.0,46.2~43.5,48.0',
+            'rspn' => 1,
         ]);
 
         $json = self::httpGet($url);
@@ -113,12 +144,14 @@ class Geocoder
 
     private static function nominatim(string $address): array
     {
+        // viewbox: left, top, right, bottom (lon/lat)
         $url = 'https://nominatim.openstreetmap.org/search?' . http_build_query([
             'q' => $address,
             'format' => 'json',
-            'limit' => 1,
+            'limit' => 3,
             'countrycodes' => 'ru',
-            'addressdetails' => 0,
+            'viewbox' => '38.0,48.0,43.5,46.2',
+            'bounded' => 1,
         ]);
 
         $json = self::httpGet($url, [
@@ -129,16 +162,20 @@ class Geocoder
             return ['point' => null, 'error' => 'network'];
         }
         $data = json_decode($json, true);
-        if (!is_array($data) || !isset($data[0]['lat'], $data[0]['lon'])) {
+        if (!is_array($data)) {
             return ['point' => null, 'error' => 'no results'];
         }
-        return [
-            'point' => [
-                'lat' => (float) $data[0]['lat'],
-                'lon' => (float) $data[0]['lon'],
-            ],
-            'error' => null,
-        ];
+        foreach ($data as $row) {
+            if (!isset($row['lat'], $row['lon'])) {
+                continue;
+            }
+            $lat = (float) $row['lat'];
+            $lon = (float) $row['lon'];
+            if (self::inRegion($lat, $lon)) {
+                return ['point' => ['lat' => $lat, 'lon' => $lon], 'error' => null];
+            }
+        }
+        return ['point' => null, 'error' => 'no results'];
     }
 
     private static function httpGet(string $url, array $headers = []): ?string
