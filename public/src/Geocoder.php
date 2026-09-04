@@ -8,10 +8,6 @@ class Geocoder
         return $meta['point'] ?? null;
     }
 
-    /**
-     * Сначала Яндекс (если ключ есть), при ошибке — Nominatim (OSM).
-     * @return array{point: ?array, error: ?string, provider: ?string}
-     */
     public static function geocodeWithMeta(string $address, string $yandexKey = ''): array
     {
         $address = trim($address);
@@ -19,33 +15,71 @@ class Geocoder
             return ['point' => null, 'error' => 'empty address', 'provider' => null];
         }
 
-        // Уточняем регион для посёлков
-        $query = $address;
-        if (!preg_match('/ростов|новочерк|шахт/ui', $query)) {
-            $query .= ', Ростовская область, Россия';
-        }
-
         if ($yandexKey !== '') {
-            $y = self::yandex($query, $yandexKey);
+            $y = self::yandex($address . ', Россия', $yandexKey);
             if ($y['point']) {
-                return $y + ['provider' => 'yandex'];
+                return ['point' => $y['point'], 'error' => null, 'provider' => 'yandex'];
             }
-            // fall through to OSM
             $yandexError = $y['error'];
         } else {
             $yandexError = null;
         }
 
-        $osm = self::nominatim($query);
-        if ($osm['point']) {
-            return $osm + ['provider' => 'nominatim'];
+        foreach (self::queryVariants($address) as $q) {
+            $osm = self::nominatim($q);
+            if ($osm['point']) {
+                return ['point' => $osm['point'], 'error' => null, 'provider' => 'nominatim'];
+            }
+            usleep(400000);
         }
 
         return [
             'point' => null,
-            'error' => trim(($yandexError ? "yandex: $yandexError; " : '') . 'osm: ' . ($osm['error'] ?? 'fail')),
+            'error' => trim(($yandexError ? "yandex: $yandexError; " : '') . 'osm: no results'),
             'provider' => null,
         ];
+    }
+
+    /** Несколько формулировок — посёлки OSM знает хуже, чем города */
+    private static function queryVariants(string $address): array
+    {
+        $a = preg_replace('/\s+/u', ' ', trim($address));
+        $variants = [$a];
+
+        // Без «пос.» / «п.»
+        $variants[] = preg_replace('/\b(пос\.?|п\.|посёлок|поселок)\s+/ui', '', $a);
+
+        // Только населённый пункт + область
+        if (preg_match('/Молод[её]жн\w*/ui', $a, $m)) {
+            $variants[] = 'посёлок Молодёжный Октябрьский район Ростовская область';
+            $variants[] = 'Молодёжный Ростовская область';
+        }
+        if (preg_match('/Донск\w*/ui', $a, $m)) {
+            $variants[] = 'посёлок Донской Октябрьский район Ростовская область';
+            $variants[] = 'Донской Ростовская область';
+        }
+        if (preg_match('/Новочеркасск/ui', $a)) {
+            $variants[] = $a . ', Ростовская область';
+            // улица + город
+            if (preg_match('/(ул\.?|улица|пр\.?|проспект|пер\.?|переулок)\s*([^,]+)/ui', $a, $um)) {
+                $variants[] = trim($um[0]) . ', Новочеркасск, Ростовская область';
+            }
+        }
+        if (preg_match('/Шахт/ui', $a)) {
+            $variants[] = $a . ', Ростовская область';
+        }
+
+        $variants[] = $a . ', Ростовская область, Россия';
+
+        // уникальные
+        $out = [];
+        foreach ($variants as $v) {
+            $v = trim(preg_replace('/\s+/u', ' ', $v));
+            if ($v !== '' && !in_array($v, $out, true)) {
+                $out[] = $v;
+            }
+        }
+        return $out;
     }
 
     private static function yandex(string $address, string $apiKey): array
@@ -84,10 +118,11 @@ class Geocoder
             'format' => 'json',
             'limit' => 1,
             'countrycodes' => 'ru',
+            'addressdetails' => 0,
         ]);
 
         $json = self::httpGet($url, [
-            'User-Agent: 1c-delivery-logistics/1.0 (Beget; logistics desk)',
+            'User-Agent: 1c-delivery-logistics/1.0 (contact: logistics-desk)',
             'Accept-Language: ru',
         ]);
         if ($json === null) {
@@ -110,15 +145,11 @@ class Geocoder
     {
         $headerLines = '';
         foreach ($headers as $k => $v) {
-            if (is_int($k)) {
-                $headerLines .= $v . "\r\n";
-            } else {
-                $headerLines .= $k . ': ' . $v . "\r\n";
-            }
+            $headerLines .= (is_int($k) ? $v : ($k . ': ' . $v)) . "\r\n";
         }
         $ctx = stream_context_create([
             'http' => [
-                'timeout' => 12,
+                'timeout' => 15,
                 'ignore_errors' => true,
                 'header' => $headerLines,
             ],
