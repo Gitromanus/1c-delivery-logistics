@@ -6,6 +6,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 $config = require (defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__)) . '/config.php';
 $apiKey = (string) ($config['api_key'] ?? '');
+$yandexKey = (string) ($config['yandex_maps_key'] ?? '');
 
 $given = $_SERVER['HTTP_X_API_KEY'] ?? ($_POST['api_key'] ?? '');
 if ($apiKey === '' || !hash_equals($apiKey, (string) $given)) {
@@ -41,13 +42,15 @@ if (isset($data['orders']) && is_array($data['orders'])) {
 
 $pdo = Database::pdo();
 $upsert = $pdo->prepare(
-    "INSERT INTO orders (external_id, number, doc_date, partner, address, weight_kg, amount, comment, zone_id, status)
-     VALUES (:external_id, :number, :doc_date, :partner, :address, :weight_kg, :amount, :comment, :zone_id, 'new')
+    "INSERT INTO orders (external_id, number, doc_date, partner, address, lat, lon, weight_kg, amount, comment, zone_id, status)
+     VALUES (:external_id, :number, :doc_date, :partner, :address, :lat, :lon, :weight_kg, :amount, :comment, :zone_id, 'new')
      ON DUPLICATE KEY UPDATE
        number = VALUES(number),
        doc_date = VALUES(doc_date),
        partner = VALUES(partner),
        address = VALUES(address),
+       lat = COALESCE(VALUES(lat), lat),
+       lon = COALESCE(VALUES(lon), lon),
        weight_kg = VALUES(weight_kg),
        amount = VALUES(amount),
        comment = VALUES(comment),
@@ -66,6 +69,16 @@ foreach ($items as $i => $row) {
     $address = trim((string) $row['address']);
     $zoneId = ZoneMatcher::matchZoneId($pdo, $address);
 
+    $lat = isset($row['lat']) ? (float) $row['lat'] : null;
+    $lon = isset($row['lon']) ? (float) $row['lon'] : null;
+    if ($lat === null && $lon === null && $yandexKey !== '') {
+        $geo = Geocoder::geocode($address, $yandexKey);
+        if ($geo) {
+            $lat = $geo['lat'];
+            $lon = $geo['lon'];
+        }
+    }
+
     try {
         $upsert->execute([
             ':external_id' => (string) $row['external_id'],
@@ -73,6 +86,8 @@ foreach ($items as $i => $row) {
             ':doc_date' => !empty($row['doc_date']) ? (string) $row['doc_date'] : date('Y-m-d'),
             ':partner' => isset($row['partner']) ? (string) $row['partner'] : null,
             ':address' => $address,
+            ':lat' => $lat,
+            ':lon' => $lon,
             ':weight_kg' => isset($row['weight_kg']) ? (float) $row['weight_kg'] : 0,
             ':amount' => isset($row['amount']) ? (float) $row['amount'] : null,
             ':comment' => isset($row['comment']) ? (string) $row['comment'] : null,

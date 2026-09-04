@@ -1,8 +1,4 @@
 <?php
-/**
- * Скопируйте в config.php и заполните.
- * config.php не должен попадать в git (см. .gitignore).
- */
 return [
     'db' => [
         'host' => 'localhost',
@@ -11,9 +7,10 @@ return [
         'pass' => 'your_db_password',
         'charset' => 'utf8mb4',
     ],
-    // Ключ для POST /api/orders.php из 1С
+    // Ключ для POST /api/orders.php из 1С (свой секрет, НЕ ключ Яндекса)
     'api_key' => 'change-me-to-long-random-string',
-    // Пароль простой админки /admin/
+    // Ключ JavaScript API Яндекс.Карт
+    'yandex_maps_key' => '',
     'admin_password' => 'admin',
     'timezone' => 'Europe/Moscow',
 ];
