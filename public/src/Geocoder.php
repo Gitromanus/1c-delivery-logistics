@@ -34,6 +34,12 @@ class Geocoder
             $yandexError = null;
         }
 
+        // Photon (OSM-based, бесплатно, без ключа)
+        $ph = self::photon($address);
+        if ($ph['point']) {
+            return ['point' => $ph['point'], 'error' => null, 'provider' => 'photon'];
+        }
+
         foreach (self::queryVariants($address) as $q) {
             $osm = self::nominatim($q);
             if ($osm['point'] && self::inRegion($osm['point']['lat'], $osm['point']['lon'])) {
@@ -213,6 +219,38 @@ class Geocoder
             }
         }
         return ['point' => null, 'error' => 'no results'];
+    }
+
+    private static function photon(string $address): array
+    {
+        // Photon (komoot) — OSM, бесплатно, без ключа. bbox ограничивает зону доставки.
+        $url = 'https://photon.komoot.io/api/?' . http_build_query([
+            'q' => $address,
+            'limit' => 5,
+            'lang' => 'ru',
+            'bbox' => sprintf('%s,%s,%s,%s', self::LON_MIN, self::LAT_MIN, self::LON_MAX, self::LAT_MAX),
+        ]);
+
+        $json = self::httpGet($url, ['User-Agent: 1c-delivery-logistics/1.0 (contact: logistics-desk)']);
+        if ($json === null) {
+            return ['point' => null, 'error' => 'network'];
+        }
+        $data = json_decode($json, true);
+        if (!is_array($data) || empty($data['features'])) {
+            return ['point' => null, 'error' => 'no results'];
+        }
+        foreach ($data['features'] as $f) {
+            $geom = $f['geometry']['coordinates'] ?? null; // [lon, lat]
+            if (!is_array($geom) || count($geom) < 2) {
+                continue;
+            }
+            $lon = (float) $geom[0];
+            $lat = (float) $geom[1];
+            if (self::inRegion($lat, $lon)) {
+                return ['point' => ['lat' => $lat, 'lon' => $lon], 'error' => null];
+            }
+        }
+        return ['point' => null, 'error' => 'no results in region'];
     }
 
     private static function httpGet(string $url, array $headers = []): ?string
