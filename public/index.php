@@ -65,6 +65,10 @@ $mapOrders = $pdo->prepare(
 $mapOrders->execute([$date]);
 $mapPoints = $mapOrders->fetchAll();
 
+$needGeo = array_values(array_filter($mapPoints, function ($p) {
+    return empty($p['lat']) || empty($p['lon']);
+}));
+
 function h(?string $s): string
 {
     return htmlspecialchars((string) $s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -90,6 +94,9 @@ function h(?string $s): string
         <input type="date" name="date" value="<?= h($date) ?>" onchange="this.form.submit()">
       </form>
       <button type="button" class="btn btn-ghost" id="rebuildBtn">Пересобрать рейсы</button>
+      <?php if ($yandexKey !== '' && count($needGeo) > 0): ?>
+      <button type="button" class="btn btn-primary" id="geocodeBtn">Геокод с карты (<?= count($needGeo) ?>)</button>
+      <?php endif; ?>
       <a class="btn btn-ghost" href="admin/">Админка</a>
     </div>
   </header>
@@ -112,23 +119,21 @@ function h(?string $s): string
           <?php endif; ?>
         </div>
       <?php endforeach; ?>
-
-      <?php if (!empty($stats[0]) || !empty($stats[''])): ?>
-        <div class="zone-card">
-          <div class="name">Без зоны</div>
-          <div class="meta"><?= (int) ($stats[0]['cnt'] ?? 0) ?> заявок</div>
-          <span class="badge badge-warn">Проверить адрес</span>
-        </div>
-      <?php endif; ?>
     </section>
 
     <section class="panel map-panel">
       <h2>Карта заявок</h2>
       <?php if ($yandexKey === ''): ?>
-        <p class="muted">Укажите <code>yandex_maps_key</code> в config.php (не путайте с api_key для 1С).</p>
+        <p class="muted">Укажите <code>yandex_maps_key</code> в config.php</p>
       <?php else: ?>
         <div id="map" class="map-box"></div>
-        <p class="muted" style="margin-top:8px">Метки — заявки с координатами. Если точек нет: sql/migrate_coords.sql + /api/geocode_missing.php</p>
+        <p class="muted" style="margin-top:8px" id="mapHint">
+          <?php if (count($needGeo) > 0): ?>
+            Без координат: <?= count($needGeo) ?>. Нажмите «Геокод с карты» — через JS API Яндекса.
+          <?php else: ?>
+            Метки по сохранённым координатам.
+          <?php endif; ?>
+        </p>
       <?php endif; ?>
 
       <h2 style="margin-top:16px">Нераспределённые</h2>
@@ -136,9 +141,7 @@ function h(?string $s): string
         <p class="muted">Нет заявок со статусом «new».</p>
       <?php else: ?>
         <table>
-          <thead>
-          <tr><th>№</th><th>Адрес</th><th>Кг</th></tr>
-          </thead>
+          <thead><tr><th>№</th><th>Адрес</th><th>Кг</th></tr></thead>
           <tbody>
           <?php foreach ($freeOrders as $o): ?>
             <tr>
@@ -160,9 +163,7 @@ function h(?string $s): string
       <?php foreach ($trips as $t):
           $list = $itemsByTrip[$t['id']] ?? [];
           $sum = 0;
-          foreach ($list as $o) {
-              $sum += (float) $o['weight_kg'];
-          }
+          foreach ($list as $o) { $sum += (float) $o['weight_kg']; }
           $cap = (float) $t['capacity_kg'];
           $pct = $cap > 0 ? min(100, round($sum / $cap * 100)) : 0;
           $over = $sum > $cap + 0.01;
@@ -171,7 +172,7 @@ function h(?string $s): string
           <div class="title"><?= h($t['vehicle_name']) ?><?= $t['plate'] ? ' · ' . h($t['plate']) : '' ?></div>
           <div class="muted"><?= h($t['zone_name'] ?: 'Зона не указана') ?> · <?= h($t['status']) ?></div>
           <div class="bar <?= $over ? 'over' : '' ?>"><i style="width:<?= $pct ?>%"></i></div>
-          <div class="muted"><?= number_format($sum, 0, '.', ' ') ?> / <?= number_format($cap, 0, '.', ' ') ?> кг (<?= $pct ?>%)</div>
+          <div class="muted"><?= number_format($sum, 0, '.', ' ') ?> / <?= number_format($cap, 0, '.', ' ') ?> кг</div>
           <table style="margin-top:8px">
             <?php foreach ($list as $o): ?>
               <tr>
@@ -185,59 +186,96 @@ function h(?string $s): string
       <?php endforeach; ?>
     </section>
   </div>
-
-  <footer class="footer">Источник: Реализация товаров и услуг (УТ 11) · Agent+</footer>
+  <footer class="footer">УТ 11 · Agent+</footer>
 </div>
 <script>
 const mapPoints = <?= json_encode($mapPoints, JSON_UNESCAPED_UNICODE) ?>;
+const needGeo = <?= json_encode($needGeo, JSON_UNESCAPED_UNICODE) ?>;
 
 document.getElementById('rebuildBtn').addEventListener('click', async () => {
   const btn = document.getElementById('rebuildBtn');
   btn.disabled = true;
   btn.textContent = 'Сборка…';
   try {
-    const r = await fetch('api/rebuild.php?date=<?= urlencode($date) ?>', { method: 'POST', credentials: 'same-origin' });
+    const r = await fetch('api/rebuild.php?date=<?= urlencode($date) ?>', { method: 'POST' });
     const data = await r.json();
-    if (data.warnings && data.warnings.length) {
-      alert('Готово.\n\nПредупреждения:\n' + data.warnings.join('\n'));
-    }
+    if (data.warnings && data.warnings.length) alert('Готово.\n\n' + data.warnings.join('\n'));
     location.reload();
   } catch (e) {
-    alert('Ошибка: ' + e.message);
+    alert(e.message);
     btn.disabled = false;
     btn.textContent = 'Пересобрать рейсы';
   }
 });
 
+function addMarks(map, points) {
+  const withCoords = (points || []).filter(p => p.lat && p.lon);
+  if (!withCoords.length) return null;
+  const collection = new ymaps.GeoObjectCollection();
+  withCoords.forEach(p => {
+    const title = (p.number || p.external_id || '') + ' · ' + (p.weight_kg || 0) + ' кг';
+    collection.add(new ymaps.Placemark([parseFloat(p.lat), parseFloat(p.lon)], {
+      balloonContent: '<strong>' + title + '</strong><br>' + (p.partner || '') + '<br>' + (p.address || ''),
+      iconCaption: p.number || p.external_id
+    }, {
+      preset: p.status === 'new' ? 'islands#orangeDotIcon' : 'islands#greenDotIcon'
+    }));
+  });
+  map.geoObjects.add(collection);
+  try {
+    map.setBounds(collection.getBounds(), { checkZoomRange: true, zoomMargin: 40 });
+  } catch (e) {}
+  return collection;
+}
+
 <?php if ($yandexKey !== ''): ?>
 if (typeof ymaps !== 'undefined') {
   ymaps.ready(function () {
     const map = new ymaps.Map('map', {
-      center: [47.411, 40.091], // Новочеркасск / область
+      center: [47.411, 40.091],
       zoom: 10,
       controls: ['zoomControl', 'typeSelector']
     });
+    window.__logisticsMap = map;
+    addMarks(map, mapPoints);
 
-    const points = (mapPoints || []).filter(p => p.lat && p.lon);
-    if (!points.length) {
-      return;
+    const geoBtn = document.getElementById('geocodeBtn');
+    if (geoBtn && needGeo.length) {
+      geoBtn.addEventListener('click', async () => {
+        geoBtn.disabled = true;
+        geoBtn.textContent = 'Геокодинг…';
+        const saved = [];
+        for (let i = 0; i < needGeo.length; i++) {
+          const o = needGeo[i];
+          try {
+            const res = await ymaps.geocode(o.address, { results: 1 });
+            const obj = res.geoObjects.get(0);
+            if (!obj) continue;
+            const c = obj.geometry.getCoordinates(); // [lat, lon]
+            o.lat = c[0];
+            o.lon = c[1];
+            saved.push({ id: o.id, lat: c[0], lon: c[1] });
+          } catch (e) {
+            console.warn(o.address, e);
+          }
+          geoBtn.textContent = 'Геокодинг… ' + (i + 1) + '/' + needGeo.length;
+        }
+        if (saved.length) {
+          await fetch('api/save_coords.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: saved })
+          });
+          addMarks(map, needGeo);
+          alert('Сохранено координат: ' + saved.length);
+          location.reload();
+        } else {
+          alert('Не удалось геокодировать. Проверьте ключ JS API и адреса.');
+          geoBtn.disabled = false;
+          geoBtn.textContent = 'Геокод с карты';
+        }
+      });
     }
-
-    const collection = new ymaps.GeoObjectCollection();
-    points.forEach(p => {
-      const title = (p.number || p.external_id || '') + ' · ' + (p.weight_kg || 0) + ' кг';
-      const balloon = '<strong>' + title + '</strong><br>' +
-        (p.partner ? p.partner + '<br>' : '') +
-        (p.address || '') + '<br>статус: ' + (p.status || '');
-      collection.add(new ymaps.Placemark([parseFloat(p.lat), parseFloat(p.lon)], {
-        balloonContent: balloon,
-        iconCaption: p.number || p.external_id
-      }, {
-        preset: p.status === 'new' ? 'islands#orangeDotIcon' : 'islands#greenDotIcon'
-      }));
-    });
-    map.geoObjects.add(collection);
-    map.setBounds(collection.getBounds(), { checkZoomRange: true, zoomMargin: 40 });
   });
 }
 <?php endif; ?>
