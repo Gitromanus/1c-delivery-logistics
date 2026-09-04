@@ -1,5 +1,8 @@
 <?php
 require __DIR__ . '/bootstrap.php';
+$config = require (defined('APP_ROOT') ? APP_ROOT : __DIR__) . '/config.php';
+$yandexKey = (string) ($config['yandex_maps_key'] ?? '');
+
 $pdo = Database::pdo();
 $date = $_GET['date'] ?? date('Y-m-d');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
@@ -55,6 +58,13 @@ $unassigned = $pdo->prepare(
 $unassigned->execute([$date]);
 $freeOrders = $unassigned->fetchAll();
 
+$mapOrders = $pdo->prepare(
+    "SELECT id, number, external_id, partner, address, weight_kg, lat, lon, status, zone_id
+     FROM orders WHERE doc_date = ? AND status <> 'cancelled'"
+);
+$mapOrders->execute([$date]);
+$mapPoints = $mapOrders->fetchAll();
+
 function h(?string $s): string
 {
     return htmlspecialchars((string) $s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -67,6 +77,9 @@ function h(?string $s): string
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Логистика доставки</title>
   <link rel="stylesheet" href="assets/css/style.css">
+  <?php if ($yandexKey !== ''): ?>
+  <script src="https://api-maps.yandex.ru/2.1/?apikey=<?= h($yandexKey) ?>&lang=ru_RU"></script>
+  <?php endif; ?>
 </head>
 <body>
 <div class="app">
@@ -109,28 +122,34 @@ function h(?string $s): string
       <?php endif; ?>
     </section>
 
-    <section class="panel">
-      <h2>Нераспределённые заявки</h2>
+    <section class="panel map-panel">
+      <h2>Карта заявок</h2>
+      <?php if ($yandexKey === ''): ?>
+        <p class="muted">Укажите <code>yandex_maps_key</code> в config.php (не путайте с api_key для 1С).</p>
+      <?php else: ?>
+        <div id="map" class="map-box"></div>
+        <p class="muted" style="margin-top:8px">Метки — заявки с координатами. Если точек нет: sql/migrate_coords.sql + /api/geocode_missing.php</p>
+      <?php endif; ?>
+
+      <h2 style="margin-top:16px">Нераспределённые</h2>
       <?php if (!$freeOrders): ?>
-        <p class="muted">Нет заявок со статусом «new» — всё в рейсах или пусто.</p>
+        <p class="muted">Нет заявок со статусом «new».</p>
       <?php else: ?>
         <table>
           <thead>
-          <tr><th>№</th><th>Контрагент</th><th>Адрес</th><th>Кг</th></tr>
+          <tr><th>№</th><th>Адрес</th><th>Кг</th></tr>
           </thead>
           <tbody>
           <?php foreach ($freeOrders as $o): ?>
             <tr>
               <td><?= h($o['number'] ?: $o['external_id']) ?></td>
-              <td><?= h($o['partner']) ?></td>
-              <td><?= h($o['address']) ?></td>
+              <td><?= h(mb_strimwidth($o['address'], 0, 48, '…', 'UTF-8')) ?></td>
               <td><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?></td>
             </tr>
           <?php endforeach; ?>
           </tbody>
         </table>
       <?php endif; ?>
-      <p class="muted" style="margin-top:12px">Заявки приходят из 1С через API · зона — по ключевым словам в адресе</p>
     </section>
 
     <section class="panel">
@@ -170,6 +189,8 @@ function h(?string $s): string
   <footer class="footer">Источник: Реализация товаров и услуг (УТ 11) · Agent+</footer>
 </div>
 <script>
+const mapPoints = <?= json_encode($mapPoints, JSON_UNESCAPED_UNICODE) ?>;
+
 document.getElementById('rebuildBtn').addEventListener('click', async () => {
   const btn = document.getElementById('rebuildBtn');
   btn.disabled = true;
@@ -187,6 +208,39 @@ document.getElementById('rebuildBtn').addEventListener('click', async () => {
     btn.textContent = 'Пересобрать рейсы';
   }
 });
+
+<?php if ($yandexKey !== ''): ?>
+if (typeof ymaps !== 'undefined') {
+  ymaps.ready(function () {
+    const map = new ymaps.Map('map', {
+      center: [47.411, 40.091], // Новочеркасск / область
+      zoom: 10,
+      controls: ['zoomControl', 'typeSelector']
+    });
+
+    const points = (mapPoints || []).filter(p => p.lat && p.lon);
+    if (!points.length) {
+      return;
+    }
+
+    const collection = new ymaps.GeoObjectCollection();
+    points.forEach(p => {
+      const title = (p.number || p.external_id || '') + ' · ' + (p.weight_kg || 0) + ' кг';
+      const balloon = '<strong>' + title + '</strong><br>' +
+        (p.partner ? p.partner + '<br>' : '') +
+        (p.address || '') + '<br>статус: ' + (p.status || '');
+      collection.add(new ymaps.Placemark([parseFloat(p.lat), parseFloat(p.lon)], {
+        balloonContent: balloon,
+        iconCaption: p.number || p.external_id
+      }, {
+        preset: p.status === 'new' ? 'islands#orangeDotIcon' : 'islands#greenDotIcon'
+      }));
+    });
+    map.geoObjects.add(collection);
+    map.setBounds(collection.getBounds(), { checkZoomRange: true, zoomMargin: 40 });
+  });
+}
+<?php endif; ?>
 </script>
 </body>
 </html>
