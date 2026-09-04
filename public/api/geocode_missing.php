@@ -1,8 +1,4 @@
 <?php
-/**
- * Разово проставить координаты у заявок без lat/lon (нужен yandex_maps_key).
- * Открой в браузере будучи залогиненным в admin ИЛИ с X-Api-Key.
- */
 session_start();
 require dirname(__DIR__) . '/bootstrap.php';
 
@@ -26,22 +22,39 @@ if ($yandexKey === '') {
 
 $pdo = Database::pdo();
 $rows = $pdo->query(
-    "SELECT id, address FROM orders WHERE (lat IS NULL OR lon IS NULL) AND address <> '' ORDER BY id DESC LIMIT 30"
+    "SELECT id, address FROM orders WHERE (lat IS NULL OR lon IS NULL) AND address <> '' ORDER BY id DESC LIMIT 15"
 )->fetchAll();
 
 $upd = $pdo->prepare('UPDATE orders SET lat = ?, lon = ? WHERE id = ?');
 $ok = 0;
 $fail = 0;
+$errors = [];
 
 foreach ($rows as $row) {
-    $geo = Geocoder::geocode($row['address'], $yandexKey);
-    if ($geo) {
-        $upd->execute([$geo['lat'], $geo['lon'], $row['id']]);
+    $meta = Geocoder::geocodeWithMeta($row['address'], $yandexKey);
+    if ($meta['point']) {
+        $upd->execute([$meta['point']['lat'], $meta['point']['lon'], $row['id']]);
         $ok++;
     } else {
         $fail++;
+        if (count($errors) < 5) {
+            $errors[] = [
+                'id' => (int) $row['id'],
+                'address' => $row['address'],
+                'error' => $meta['error'],
+            ];
+        }
     }
-    usleep(150000); // не долбить API
+    usleep(200000);
 }
 
-echo json_encode(['ok' => true, 'geocoded' => $ok, 'failed' => $fail, 'left_batch' => count($rows)], JSON_UNESCAPED_UNICODE);
+echo json_encode([
+    'ok' => true,
+    'geocoded' => $ok,
+    'failed' => $fail,
+    'left_batch' => count($rows),
+    'hint' => $ok === 0
+        ? 'HTTP-геокодер часто не принимает ключ только JS API. Используйте кнопку «Геокод с карты» на главной.'
+        : null,
+    'sample_errors' => $errors,
+], JSON_UNESCAPED_UNICODE);
