@@ -106,7 +106,6 @@ function h(?string $s): string
         <input type="date" name="date" value="<?= h($date) ?>" onchange="this.form.submit()">
       </form>
       <button type="button" class="btn btn-ghost" id="rebuildBtn">Пересобрать рейсы</button>
-      <button type="button" class="btn btn-ghost" id="rezoneBtn" title="Временный инструмент">Пересчитать зоны</button>
       <?php if ($yandexKey !== '' && count($needGeo) > 0): ?>
       <button type="button" class="btn btn-primary" id="geocodeBtn">Геокод с карты (<?= count($needGeo) ?>)</button>
       <?php endif; ?>
@@ -154,18 +153,18 @@ function h(?string $s): string
       <?php if (!$freeOrders): ?>
         <p class="muted">Нет заявок со статусом «new».</p>
       <?php else: ?>
-        <table>
-          <thead><tr><th>№</th><th>Адрес</th><th>Кг</th></tr></thead>
-          <tbody id="unassignedZone">
+        <div id="unassignedZone">
           <?php foreach ($freeOrders as $o): ?>
-            <tr class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="" draggable="true">
-              <td><?= h($o['number'] ?: $o['external_id']) ?></td>
-              <td><?= h(mb_strimwidth($o['address'], 0, 48, '…', 'UTF-8')) ?></td>
-              <td><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?></td>
-            </tr>
+            <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="" draggable="true"
+                 style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid #e4e7ec;border-radius:8px;margin-bottom:6px;background:#fff;cursor:grab;box-shadow:0 1px 2px rgba(16,24,40,.05)">
+              <div style="min-width:0;flex:1">
+                <div style="font-weight:600;font-size:13px;line-height:1.2"><?= h($o['number'] ?: $o['external_id']) ?></div>
+                <div style="font-size:12px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= h($o['address']) ?></div>
+              </div>
+              <span style="flex:0 0 auto;font-size:12px;font-weight:600;background:#eef2ff;color:#3538cd;border-radius:20px;padding:2px 10px"><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?> кг</span>
+            </div>
           <?php endforeach; ?>
-          </tbody>
-        </table>
+        </div>
       <?php endif; ?>
     </section>
 
@@ -187,15 +186,18 @@ function h(?string $s): string
           <div class="muted"><?= h($t['zone_name'] ?: 'Зона не указана') ?> · <?= h($t['status']) ?></div>
           <div class="bar <?= $over ? 'over' : '' ?>"><i style="width:<?= $pct ?>%"></i></div>
           <div class="muted"><?= number_format($sum, 0, '.', ' ') ?> / <?= number_format($cap, 0, '.', ' ') ?> кг</div>
-          <table style="margin-top:8px">
+          <div style="margin-top:8px">
             <?php foreach ($list as $o): ?>
-              <tr class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="<?= (int) $t['id'] ?>" draggable="true">
-                <td><?= h($o['number'] ?: $o['external_id']) ?></td>
-                <td><?= h(mb_strimwidth($o['address'], 0, 40, '…', 'UTF-8')) ?></td>
-                <td><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?></td>
-              </tr>
+              <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="<?= (int) $t['id'] ?>" draggable="true"
+                   style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid #e4e7ec;border-radius:8px;margin-bottom:6px;background:#fff;cursor:grab;box-shadow:0 1px 2px rgba(16,24,40,.05)">
+                <div style="min-width:0;flex:1">
+                  <div style="font-weight:600;font-size:13px;line-height:1.2"><?= h($o['number'] ?: $o['external_id']) ?></div>
+                  <div style="font-size:12px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= h($o['address']) ?></div>
+                </div>
+                <span style="flex:0 0 auto;font-size:12px;font-weight:600;background:#eef2ff;color:#3538cd;border-radius:20px;padding:2px 10px"><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?> кг</span>
+              </div>
             <?php endforeach; ?>
-          </table>
+          </div>
         </div>
       <?php endforeach; ?>
     </section>
@@ -261,20 +263,6 @@ document.getElementById('rebuildBtn').addEventListener('click', async () => {
     alert(e.message);
     btn.disabled = false;
     btn.textContent = 'Пересобрать рейсы';
-  }
-});
-
-document.getElementById('rezoneBtn').addEventListener('click', async () => {
-  const btn = document.getElementById('rezoneBtn');
-  btn.disabled = true;
-  try {
-    const r = await fetch('api/reassign_zones.php?date=<?= urlencode($date) ?>', { method: 'POST' });
-    const data = await r.json();
-    alert('Обработано: ' + data.processed + ', установлено зон: ' + data.updated + ', очищено: ' + data.cleared);
-    location.reload();
-  } catch (e) {
-    alert(e.message);
-    btn.disabled = false;
   }
 });
 
