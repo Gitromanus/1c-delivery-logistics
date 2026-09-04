@@ -156,15 +156,15 @@ function h(?string $s): string
         <div id="unassignedZone">
           <?php foreach ($freeOrders as $o): ?>
             <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="" draggable="true"
-                 style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #cfd4dc;border-radius:8px;margin-bottom:6px;background:#f2f4f7;cursor:grab;box-shadow:0 1px 2px rgba(16,24,40,.08)">
+                 style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2f3546;border-radius:8px;margin-bottom:6px;background:#1c2130;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.25)">
               <div style="min-width:0;flex:1">
-                <div style="font-weight:700;font-size:14px;color:#101828;line-height:1.25"><?= h($o['number'] ?: $o['external_id']) ?></div>
-                <div style="font-size:12px;color:#475467;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= h($o['address']) ?></div>
+                <div style="font-weight:700;font-size:14px;color:#f1f3f7;line-height:1.25"><?= h($o['number'] ?: $o['external_id']) ?></div>
+                <div style="font-size:12px;color:#9aa0a6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= h($o['address']) ?></div>
                 <?php if (!empty($o['partner'])): ?>
-                <div style="font-size:12px;color:#344054;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px"><?= h($o['partner']) ?></div>
+                <div style="font-size:12px;color:#b6bcc6;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px"><?= h($o['partner']) ?></div>
                 <?php endif; ?>
               </div>
-              <span style="flex:0 0 auto;font-size:12px;font-weight:700;background:#101828;color:#fff;border-radius:20px;padding:3px 10px"><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?> кг</span>
+              <span style="flex:0 0 auto;font-size:12px;font-weight:700;background:#2b3245;color:#dfe3ea;border-radius:20px;padding:3px 10px"><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?> кг</span>
             </div>
           <?php endforeach; ?>
         </div>
@@ -192,15 +192,15 @@ function h(?string $s): string
           <div style="margin-top:8px">
             <?php foreach ($list as $o): ?>
               <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="<?= (int) $t['id'] ?>" draggable="true"
-                   style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #cfd4dc;border-radius:8px;margin-bottom:6px;background:#f2f4f7;cursor:grab;box-shadow:0 1px 2px rgba(16,24,40,.08)">
+                   style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2f3546;border-radius:8px;margin-bottom:6px;background:#1c2130;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.25)">
                 <div style="min-width:0;flex:1">
-                  <div style="font-weight:700;font-size:14px;color:#101828;line-height:1.25"><?= h($o['number'] ?: $o['external_id']) ?></div>
-                  <div style="font-size:12px;color:#475467;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= h($o['address']) ?></div>
+                  <div style="font-weight:700;font-size:14px;color:#f1f3f7;line-height:1.25"><?= h($o['number'] ?: $o['external_id']) ?></div>
+                  <div style="font-size:12px;color:#9aa0a6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= h($o['address']) ?></div>
                   <?php if (!empty($o['partner'])): ?>
-                  <div style="font-size:12px;color:#344054;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px"><?= h($o['partner']) ?></div>
+                  <div style="font-size:12px;color:#b6bcc6;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px"><?= h($o['partner']) ?></div>
                   <?php endif; ?>
                 </div>
-                <span style="flex:0 0 auto;font-size:12px;font-weight:700;background:#101828;color:#fff;border-radius:20px;padding:3px 10px"><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?> кг</span>
+                <span style="flex:0 0 auto;font-size:12px;font-weight:700;background:#2b3245;color:#dfe3ea;border-radius:20px;padding:3px 10px"><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?> кг</span>
               </div>
             <?php endforeach; ?>
           </div>
@@ -316,18 +316,46 @@ document.addEventListener('drop', async function (e) {
   } catch (err) { alert(err.message); }
 });
 
+// Связка «карточка заказа ↔ точка на карте»
+let orderMarks = {};
+function highlightOrder(id) {
+  document.querySelectorAll('.drag-order').forEach(function (c) { c.style.outline = ''; c.style.outlineOffset = ''; });
+  Object.keys(orderMarks).forEach(function (k) {
+    const m = orderMarks[k];
+    if (m.options.get('preset') === 'islands#redCircleDotIcon') {
+      m.options.set('preset', m.__origPreset || 'islands#greenDotIcon');
+    }
+  });
+  if (id == null) return;
+  const card = document.querySelector('.drag-order[data-order-id="' + id + '"]');
+  if (card) { card.style.outline = '2px solid #f59e0b'; card.style.outlineOffset = '-2px'; }
+  const m = orderMarks[id];
+  if (m) {
+    try { window.__logisticsMap.panTo(m.geometry.getCoordinates(), { checkZoomRange: true, delay: 0 }); } catch (e) {}
+    m.options.set('preset', 'islands#redCircleDotIcon');
+  }
+}
+document.querySelectorAll('.drag-order').forEach(function (c) {
+  c.addEventListener('click', function () {
+    highlightOrder(parseInt(c.getAttribute('data-order-id'), 10));
+  });
+});
+
 function addMarks(map, points) {
   const withCoords = (points || []).filter(p => p.lat && p.lon);
   if (!withCoords.length) return null;
   const collection = new ymaps.GeoObjectCollection();
   withCoords.forEach(p => {
     const title = (p.number || p.external_id || '') + ' · ' + (p.weight_kg || 0) + ' кг';
-    collection.add(new ymaps.Placemark([parseFloat(p.lat), parseFloat(p.lon)], {
+    const preset = p.status === 'new' ? 'islands#orangeDotIcon' : 'islands#greenDotIcon';
+    const mark = new ymaps.Placemark([parseFloat(p.lat), parseFloat(p.lon)], {
       balloonContent: '<strong>' + title + '</strong><br>' + (p.partner || '') + '<br>' + (p.address || ''),
       iconCaption: p.number || p.external_id
-    }, {
-      preset: p.status === 'new' ? 'islands#orangeDotIcon' : 'islands#greenDotIcon'
-    }));
+    }, { preset: preset });
+    mark.__origPreset = preset;
+    mark.events.add('click', function () { highlightOrder(p.id); });
+    orderMarks[p.id] = mark;
+    collection.add(mark);
   });
   map.geoObjects.add(collection);
   try {
