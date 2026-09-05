@@ -140,7 +140,7 @@ function h(?string $s): string
           $totCap = 0;
           foreach ($zv as $vv) { $totCap += (float) $vv['capacity_kg']; }
         ?>
-        <div class="zone-card" data-zone-drop="<?= (int) $z['id'] ?>" style="border-left:6px solid <?= h($zcolor) ?>">
+        <div class="zone-card" data-zone-drop="<?= (int) $z['id'] ?>" data-order-w="<?= $w ?>" style="border-left:6px solid <?= h($zcolor) ?>">
           <div class="name"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:<?= h($zcolor) ?>;margin-right:6px;vertical-align:middle"></span><?= h($z['name']) ?></div>
           <div class="meta"><?= $cnt ?> заявок · <?= number_format($w, 0, '.', ' ') ?> кг</div>
           <?php if ($cnt === 0): ?>
@@ -153,7 +153,7 @@ function h(?string $s): string
           <div class="zone-cap">Загружено: <?= number_format($w, 0, '.', ' ') ?> / <?= number_format($totCap, 0, '.', ' ') ?> кг · машин: <?= count($zv) ?></div>
           <div class="zone-vehicles">
             <?php foreach ($zv as $vv): ?>
-              <div class="veh-chip" data-vehicle-id="<?= (int) $vv['vehicle_id'] ?>" data-zone-id="<?= (int) $z['id'] ?>" title="Перетащите в другую зону">
+              <div class="veh-chip" data-vehicle-id="<?= (int) $vv['vehicle_id'] ?>" data-zone-id="<?= (int) $z['id'] ?>" data-cap="<?= (float) $vv['capacity_kg'] ?>" title="Перетащите в другую зону">
                 <span class="veh-name"><?= h($vv['name']) ?></span>
                 <span class="veh-cap"><?= number_format((float) $vv['capacity_kg'], 0, '.', ' ') ?> кг</span>
               </div>
@@ -187,7 +187,7 @@ function h(?string $s): string
           <p class="muted" style="text-align:center;padding:8px 0">Пусто — перетащите заявку сюда из рейса</p>
         <?php else: ?>
           <?php foreach ($freeOrders as $o): ?>
-            <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip=""
+            <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="" data-weight="<?= (float) $o['weight_kg'] ?>"
                  style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2f3546;border-radius:8px;margin-bottom:6px;background:#1c2130;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.25)">
               <div style="min-width:0;flex:1">
                 <div style="font-weight:700;font-size:14px;color:#f1f3f7;line-height:1.25"><?= h($o['number'] ?: $o['external_id']) ?></div>
@@ -216,18 +216,18 @@ function h(?string $s): string
           $pct = $cap > 0 ? min(100, round($sum / $cap * 100)) : 0;
           $over = $sum > $cap + 0.01;
           ?>
-        <div class="trip" data-trip-id="<?= (int) $t['id'] ?>">
+        <div class="trip" data-trip-id="<?= (int) $t['id'] ?>" data-cap="<?= $cap ?>">
           <div class="title">
             <span><?= h($t['vehicle_name']) ?><?= (!empty($t['plate']) && stripos((string) $t['vehicle_name'], (string) $t['plate']) === false) ? ' · ' . h($t['plate']) : '' ?></span>
             <button type="button" class="trip-toggle" aria-label="Свернуть/развернуть" title="Свернуть/развернуть">▾</button>
           </div>
           <div class="muted"><?= h($t['zone_name'] ?: 'Зона не указана') ?> · <?= h($t['status']) ?></div>
           <div class="bar <?= $over ? 'over' : '' ?>"><i style="width:<?= $pct ?>%"></i></div>
-          <div class="muted"><?= number_format($sum, 0, '.', ' ') ?> / <?= number_format($cap, 0, '.', ' ') ?> кг</div>
+          <div class="muted trip-weight"><?= number_format($sum, 0, '.', ' ') ?> / <?= number_format($cap, 0, '.', ' ') ?> кг</div>
           <div class="trip-body">
             <div class="orders-list" style="margin-top:8px">
               <?php foreach ($list as $o): ?>
-                <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="<?= (int) $t['id'] ?>"
+                <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="<?= (int) $t['id'] ?>" data-weight="<?= (float) $o['weight_kg'] ?>"
                      style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2f3546;border-radius:8px;margin-bottom:6px;background:#1c2130;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.25)">
                   <div style="min-width:0;flex:1">
                     <div style="font-weight:700;font-size:14px;color:#f1f3f7;line-height:1.25"><?= h($o['number'] ?: $o['external_id']) ?></div>
@@ -388,17 +388,86 @@ function ddStart(el, isOrder, e) {
   document.body.classList.add('dd-dragging');
   ddMoveGhost(e);
 }
+function fmtKg(v) {
+  v = Math.round(v || 0);
+  return v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}
+function refreshTrip(tripEl) {
+  if (!tripEl) return;
+  const cap = parseFloat(tripEl.getAttribute('data-cap')) || 0;
+  let sum = 0;
+  tripEl.querySelectorAll('.orders-list > .drag-order').forEach(function (o) {
+    sum += parseFloat(o.getAttribute('data-weight')) || 0;
+  });
+  const pct = cap > 0 ? Math.min(100, Math.round(sum / cap * 100)) : 0;
+  const over = sum > cap + 0.01;
+  const bar = tripEl.querySelector('.bar');
+  if (bar) {
+    bar.classList.toggle('over', over);
+    const i = bar.querySelector('i');
+    if (i) i.style.width = pct + '%';
+  }
+  const wl = tripEl.querySelector('.trip-weight');
+  if (wl) wl.textContent = fmtKg(sum) + ' / ' + fmtKg(cap) + ' кг';
+}
+function refreshZone(zoneEl) {
+  if (!zoneEl) return;
+  let cap = 0, n = 0;
+  zoneEl.querySelectorAll('.zone-vehicles > .veh-chip').forEach(function (ch) {
+    cap += parseFloat(ch.getAttribute('data-cap')) || 0;
+    n++;
+  });
+  const orderW = parseFloat(zoneEl.getAttribute('data-order-w')) || 0;
+  const pct = cap > 0 ? Math.min(100, Math.round(orderW / cap * 100)) : 0;
+  const bar = zoneEl.querySelector('.bar');
+  if (bar) {
+    bar.classList.toggle('over', orderW > cap + 0.01);
+    const i = bar.querySelector('i');
+    if (i) i.style.width = pct + '%';
+  }
+  const capEl = zoneEl.querySelector('.zone-cap');
+  if (capEl) capEl.textContent = 'Загружено: ' + fmtKg(orderW) + ' / ' + fmtKg(cap) + ' кг · машин: ' + n;
+}
+function ddApplyMove(drag, target, insertBeforeEl) {
+  const el = drag.el;
+  const tContainer = target.container;
+  if (tContainer) {
+    if (insertBeforeEl && insertBeforeEl.parentNode === tContainer) tContainer.insertBefore(el, insertBeforeEl);
+    else tContainer.appendChild(el);
+  }
+  if (drag.isOrder) {
+    const oldTrip = drag.info.from_trip ? parseInt(drag.info.from_trip, 10) : null;
+    if (target.kind === 'trip') {
+      el.setAttribute('data-from-trip', target.tripId);
+      if (oldTrip) refreshTrip(document.querySelector('.trip[data-trip-id="' + oldTrip + '"]'));
+      refreshTrip(document.querySelector('.trip[data-trip-id="' + target.tripId + '"]'));
+    } else if (target.kind === 'un') {
+      el.setAttribute('data-from-trip', '');
+      if (oldTrip) refreshTrip(document.querySelector('.trip[data-trip-id="' + oldTrip + '"]'));
+    }
+  } else {
+    const oldZone = drag.info.from_zone ? parseInt(drag.info.from_zone, 10) : null;
+    el.setAttribute('data-zone-id', target.zoneId);
+    if (oldZone) refreshZone(document.querySelector('[data-zone-drop="' + oldZone + '"]'));
+    refreshZone(document.querySelector('[data-zone-drop="' + target.zoneId + '"]'));
+  }
+}
 async function ddFinish(e) {
   const drag = ddDrag;
   ddDrag = null;
   ddPotential = null;
   document.body.classList.remove('dd-dragging');
   if (drag.el) drag.el.classList.remove('dd-source');
-  if (drag.ghost && drag.ghost.parentNode) drag.ghost.parentNode.removeChild(drag.ghost);
-  ddClearGap();
 
   let target = drag.target;
   if (!target) target = ddDropTarget(e);
+  // запоминаем место вставки ДО очистки индикатора
+  const tContainer = target ? target.container : null;
+  const insertBeforeEl = (ddGap && ddGap.parentNode === tContainer) ? ddGap.nextElementSibling : null;
+
+  if (drag.ghost && drag.ghost.parentNode) drag.ghost.parentNode.removeChild(drag.ghost);
+  ddClearGap();
+
   if (!target) return;
   const info = drag.info;
   try {
@@ -428,7 +497,7 @@ async function ddFinish(e) {
     const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(params) });
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'error');
-    location.reload();
+    ddApplyMove(drag, target, insertBeforeEl);
   } catch (err) { alert(err.message); }
 }
 function ddBuildOrderList(container, orderId, y) {
