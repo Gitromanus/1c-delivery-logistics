@@ -148,7 +148,9 @@ function h(?string $s): string
           <?php else: ?>
             <span class="badge badge-ok">В работе</span>
           <?php endif; ?>
-          <div class="zone-cap">Машин: <?= count($zv) ?> · Грузоподъёмность: <?= number_format($totCap, 0, '.', ' ') ?> кг</div>
+          <?php $zpct = $totCap > 0 ? min(100, round($w / $totCap * 100)) : 0; ?>
+          <div class="bar <?= $w > $totCap + 0.01 ? 'over' : '' ?>"><i style="width:<?= $zpct ?>%"></i></div>
+          <div class="zone-cap">Загружено: <?= number_format($w, 0, '.', ' ') ?> / <?= number_format($totCap, 0, '.', ' ') ?> кг · машин: <?= count($zv) ?></div>
           <div class="zone-vehicles">
             <?php foreach ($zv as $vv): ?>
               <div class="veh-chip" draggable="true" data-vehicle-id="<?= (int) $vv['vehicle_id'] ?>" data-zone-id="<?= (int) $z['id'] ?>" title="Перетащите в другую зону">
@@ -216,13 +218,13 @@ function h(?string $s): string
           ?>
         <div class="trip" data-trip-id="<?= (int) $t['id'] ?>">
           <div class="title">
-            <span><?= h($t['vehicle_name']) ?><?= $t['plate'] ? ' · ' . h($t['plate']) : '' ?></span>
+            <span><?= h($t['vehicle_name']) ?><?= (!empty($t['plate']) && stripos((string) $t['vehicle_name'], (string) $t['plate']) === false) ? ' · ' . h($t['plate']) : '' ?></span>
             <button type="button" class="trip-toggle" aria-label="Свернуть/развернуть" title="Свернуть/развернуть">▾</button>
           </div>
+          <div class="muted"><?= h($t['zone_name'] ?: 'Зона не указана') ?> · <?= h($t['status']) ?></div>
+          <div class="bar <?= $over ? 'over' : '' ?>"><i style="width:<?= $pct ?>%"></i></div>
+          <div class="muted"><?= number_format($sum, 0, '.', ' ') ?> / <?= number_format($cap, 0, '.', ' ') ?> кг</div>
           <div class="trip-body">
-            <div class="muted"><?= h($t['zone_name'] ?: 'Зона не указана') ?> · <?= h($t['status']) ?></div>
-            <div class="bar <?= $over ? 'over' : '' ?>"><i style="width:<?= $pct ?>%"></i></div>
-            <div class="muted"><?= number_format($sum, 0, '.', ' ') ?> / <?= number_format($cap, 0, '.', ' ') ?> кг</div>
             <div style="margin-top:8px">
               <?php foreach ($list as $o): ?>
                 <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="<?= (int) $t['id'] ?>" draggable="true"
