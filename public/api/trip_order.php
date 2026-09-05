@@ -25,6 +25,34 @@ if (!is_array($data)) {
 }
 
 $action = (string) ($data['action'] ?? '');
+
+if ($action === 'reorder') {
+    // Ручная перестановка заявок внутри рейса (drag & drop) — не требует order_id
+    $pdo = Database::pdo();
+    $tripId = (int) ($data['trip_id'] ?? 0);
+    $orderIds = $data['order_ids'] ?? [];
+    if ($tripId <= 0 || !is_array($orderIds)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'trip_id and order_ids required']);
+        exit;
+    }
+    $tchk = $pdo->prepare('SELECT id FROM trips WHERE id = ?');
+    $tchk->execute([$tripId]);
+    if (!$tchk->fetch()) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'error' => 'trip not found']);
+        exit;
+    }
+    $stmt = $pdo->prepare('UPDATE trip_items SET sort_order = ? WHERE trip_id = ? AND order_id = ?');
+    $i = 1;
+    foreach ($orderIds as $oid) {
+        $oid = (int) $oid;
+        if ($oid > 0) { $stmt->execute([$i++, $tripId, $oid]); }
+    }
+    echo json_encode(['ok' => true, 'action' => 'reorder']);
+    exit;
+}
+
 $orderId = (int) ($data['order_id'] ?? 0);
 if ($orderId <= 0) {
     http_response_code(400);
@@ -77,32 +105,6 @@ if ($action === 'remove') {
     $pdo->prepare('DELETE FROM trip_items WHERE order_id = ? AND trip_id = ?')->execute([$orderId, $tripId]);
     $pdo->prepare("UPDATE orders SET status = 'new' WHERE id = ?")->execute([$orderId]);
     echo json_encode(['ok' => true, 'action' => 'remove']);
-    exit;
-}
-
-if ($action === 'reorder') {
-    // Ручная перестановка заявок внутри рейса (drag & drop)
-    $tripId = (int) ($data['trip_id'] ?? 0);
-    $orderIds = $data['order_ids'] ?? [];
-    if ($tripId <= 0 || !is_array($orderIds)) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'trip_id and order_ids required']);
-        exit;
-    }
-    $tchk = $pdo->prepare('SELECT id FROM trips WHERE id = ?');
-    $tchk->execute([$tripId]);
-    if (!$tchk->fetch()) {
-        http_response_code(404);
-        echo json_encode(['ok' => false, 'error' => 'trip not found']);
-        exit;
-    }
-    $stmt = $pdo->prepare('UPDATE trip_items SET sort_order = ? WHERE trip_id = ? AND order_id = ?');
-    $i = 1;
-    foreach ($orderIds as $oid) {
-        $oid = (int) $oid;
-        if ($oid > 0) { $stmt->execute([$i++, $tripId, $oid]); }
-    }
-    echo json_encode(['ok' => true, 'action' => 'reorder']);
     exit;
 }
 
