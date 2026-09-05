@@ -268,31 +268,8 @@ $tripStatusLabels = [
   </div>
 </div>
 
-<?php
-// Линии маршрутов рейсов: точки заявок в порядке следования (sort_order)
-$zoneColorMap = [];
-foreach ($zones as $z) { $zoneColorMap[(int) $z['id']] = (string) ($z['poly_color'] ?? ''); }
-$tripLines = [];
-foreach ($trips as $t) {
-    $pts = [];
-    foreach (($itemsByTrip[$t['id']] ?? []) as $o) {
-        if (!empty($o['lat']) && !empty($o['lon'])) {
-            $pts[] = [(float) $o['lat'], (float) $o['lon']];
-        }
-    }
-    if (count($pts) >= 2) {
-        $tripLines[(int) $t['id']] = [
-            'vehicle' => (string) $t['vehicle_name'],
-            'color' => ($zoneColorMap[(int) $t['zone_id']] ?? '') ?: '#ff5252',
-            'points' => $pts,
-        ];
-    }
-}
-?>
-
 <script>
 const mapPoints = <?= json_encode($mapPoints, JSON_UNESCAPED_UNICODE) ?>;
-const tripLines = <?= json_encode(array_values($tripLines), JSON_UNESCAPED_UNICODE) ?>;
 const needGeo = <?= json_encode($needGeo, JSON_UNESCAPED_UNICODE) ?>;
 const zonePolys = <?= json_encode(array_map(function ($p) {
     return [
@@ -636,22 +613,6 @@ function addMarks(map, points) {
   return collection;
 }
 
-function drawTripLines(map, lines) {
-  (lines || []).forEach(function (tl) {
-    if (!tl.points || tl.points.length < 2) return;
-    const color = tl.color || '#ff5252';
-    const poly = new ymaps.Polyline(tl.points, {
-      hintContent: (tl.vehicle || 'Рейс')
-    }, {
-      strokeColor: color,
-      strokeWidth: 4,
-      strokeOpacity: 0.85,
-      lineStyle: 'dash'
-    });
-    map.geoObjects.add(poly);
-  });
-}
-
 function drawZones(map) {
   (zonePolys || []).forEach(function (zp) {
     if (!zp.points || !zp.points.length) return;
@@ -677,7 +638,6 @@ if (typeof ymaps !== 'undefined') {
     });
     window.__logisticsMap = map;
     addMarks(map, mapPoints);
-    drawTripLines(map, tripLines);
     drawZones(map);
 
     const geoBtn = document.getElementById('geocodeBtn');
