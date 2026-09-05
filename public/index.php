@@ -225,7 +225,7 @@ function h(?string $s): string
           <div class="bar <?= $over ? 'over' : '' ?>"><i style="width:<?= $pct ?>%"></i></div>
           <div class="muted"><?= number_format($sum, 0, '.', ' ') ?> / <?= number_format($cap, 0, '.', ' ') ?> кг</div>
           <div class="trip-body">
-            <div style="margin-top:8px">
+            <div class="orders-list" style="margin-top:8px">
               <?php foreach ($list as $o): ?>
                 <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="<?= (int) $t['id'] ?>" draggable="true"
                      style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2f3546;border-radius:8px;margin-bottom:6px;background:#1c2130;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.25)">
@@ -309,141 +309,173 @@ document.getElementById('rebuildBtn').addEventListener('click', async () => {
   }
 });
 
-// Drag & drop заявок (между рейсами/нераспределёнными) и машин (между зонами)
-let dragItem = null;
+// Кастомное перетаскивание мышью: непрозрачная карточка + раздвигание списка (место вставки)
+let ddPotential = null;  // кандидат до срабатывания порога
+let ddDrag = null;       // активное перетаскивание
+let ddGap = null;        // индикатор места вставки
 
-// Рисуем непрозрачную копию перетаскиваемой карточки вместо полупрозрачного нативного образа
-function setOpaqueDragImage(e, el) {
-  try {
-    const rect = el.getBoundingClientRect();
-    const w = Math.max(1, Math.round(rect.width));
-    const h = Math.max(1, Math.round(rect.height));
-    const clone = el.cloneNode(true);
-    clone.style.position = 'absolute';
-    clone.style.left = '-9999px';
-    clone.style.top = '0';
-    clone.style.width = w + 'px';
-    clone.style.margin = '0';
-    clone.style.boxShadow = 'none';
-    document.body.appendChild(clone);
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    const bg = window.getComputedStyle(el).backgroundColor;
-    ctx.fillStyle = (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') ? bg : '#1c2130';
-    ctx.fillRect(0, 0, w, h);
-    const xml = new XMLSerializer().serializeToString(clone);
-    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '"><foreignObject width="100%" height="100%">' + xml + '</foreignObject></svg>';
-    const img = new Image();
-    img.onload = function () {
-      try { ctx.drawImage(img, 0, 0); } catch (err) {}
-      try { e.dataTransfer.setDragImage(canvas, Math.min(24, w / 2), 12); } catch (err2) {}
-      document.body.removeChild(clone);
-    };
-    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-  } catch (err) {}
+function ddGhost(src) {
+  const g = src.cloneNode(true);
+  const w = src.getBoundingClientRect().width;
+  g.classList.add('dd-ghost');
+  g.style.position = 'fixed';
+  g.style.left = '-9999px';
+  g.style.top = '0';
+  g.style.width = w + 'px';
+  g.style.pointerEvents = 'none';
+  document.body.appendChild(g);
+  return g;
 }
-
-document.addEventListener('dragstart', function (e) {
-  // Машина — перенос между зонами
-  const chip = e.target.closest('.veh-chip');
-  if (chip) {
-    dragItem = {
-      type: 'veh',
-      vehicle_id: parseInt(chip.getAttribute('data-vehicle-id'), 10),
-      from_zone: parseInt(chip.getAttribute('data-zone-id'), 10)
-    };
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', 'veh' + dragItem.vehicle_id);
-    setOpaqueDragImage(e, chip);
-    return;
+function ddMoveGhost(e) {
+  if (!ddDrag.ghost) return;
+  const w = ddDrag.ghost.offsetWidth;
+  ddDrag.ghost.style.left = (e.clientX - w / 2) + 'px';
+  ddDrag.ghost.style.top = (e.clientY - 14) + 'px';
+}
+function ddClearGap() {
+  if (ddGap && ddGap.parentNode) ddGap.parentNode.removeChild(ddGap);
+  ddGap = null;
+}
+function ddShowGap(container, beforeEl) {
+  ddClearGap();
+  ddGap = document.createElement('div');
+  ddGap.className = 'dd-gap';
+  if (beforeEl) container.insertBefore(ddGap, beforeEl);
+  else container.appendChild(ddGap);
+}
+function ddItems(container) {
+  return Array.from(container.querySelectorAll(':scope > .drag-order, :scope > .veh-chip'))
+    .filter(function (it) { return !it.classList.contains('dd-source'); });
+}
+function ddInsertBefore(items, y) {
+  for (var i = 0; i < items.length; i++) {
+    var r = items[i].getBoundingClientRect();
+    if (y < r.top + r.height / 2) return items[i];
   }
-  // Заявка
-  const tr = e.target.closest('.drag-order');
-  if (!tr) { dragItem = null; return; }
-  dragItem = {
-    type: 'order',
-    order_id: parseInt(tr.getAttribute('data-order-id'), 10),
-    from_trip: tr.getAttribute('data-from-trip') || null
-  };
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', String(dragItem.order_id));
-  setOpaqueDragImage(e, tr);
-});
-
-document.addEventListener('dragover', function (e) {
-  const trip = e.target.closest('[data-trip-id]');
-  const un = e.target.closest('#unassignedZone');
-  const zone = e.target.closest('[data-zone-drop]');
-  if (trip || un || zone) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
-  if (zone && dragItem && dragItem.type === 'veh') {
-    document.querySelectorAll('[data-zone-drop].drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
-    zone.classList.add('drag-over');
-  }
-});
-
-document.addEventListener('drop', async function (e) {
-  if (!dragItem) return;
-  e.preventDefault();
-  const item = dragItem;
-  dragItem = null;
-  document.querySelectorAll('[data-zone-drop].drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
-
-  // Перенос машины между зонами
-  if (item.type === 'veh') {
-    const zone = e.target.closest('[data-zone-drop]');
-    if (!zone) return;
-    const toZone = parseInt(zone.getAttribute('data-zone-drop'), 10);
-    if (item.from_zone === toZone) return;
-    try {
-      const r = await fetch('api/vehicle_zone.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', vehicle_id: item.vehicle_id, zone_id: toZone }) });
-      const d = await r.json();
-      if (!d.ok) throw new Error(d.error || 'error');
-      location.reload();
-    } catch (err) { alert(err.message); }
-    return;
-  }
-
-  // Перенос заявки
-  const trip = e.target.closest('[data-trip-id]');
-  const un = e.target.closest('#unassignedZone');
-  const orderId = item.order_id;
-  const fromTrip = item.from_trip;
-  try {
-    let params;
+  return null;
+}
+function ddDropTarget(e) {
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  if (!under) return null;
+  if (ddDrag.isOrder) {
+    const trip = under.closest('.trip');
     if (trip) {
-      const toTrip = parseInt(trip.getAttribute('data-trip-id'), 10);
-      if (fromTrip && parseInt(fromTrip, 10) === toTrip) {
-        // Перестановка внутри рейса — вручную меняем порядок заявок
-        const targ = e.target.closest('.drag-order');
-        if (!targ) return;
-        const list = Array.from(trip.querySelectorAll('.drag-order')).map(function (el) { return parseInt(el.getAttribute('data-order-id'), 10); });
-        const fi = list.indexOf(orderId);
-        const ti = list.indexOf(parseInt(targ.getAttribute('data-order-id'), 10));
-        if (fi === -1 || ti === -1) return;
-        list.splice(fi, 1);
-        list.splice(list.indexOf(parseInt(targ.getAttribute('data-order-id'), 10)), 0, orderId);
-        params = { action: 'reorder', trip_id: toTrip, order_ids: list };
-      } else {
-        params = { action: fromTrip ? 'move' : 'add', order_id: orderId, from_trip_id: fromTrip, to_trip_id: toTrip };
-      }
-    } else if (un) {
-      if (!fromTrip) return;
-      params = { action: 'remove', order_id: orderId, trip_id: parseInt(fromTrip, 10) };
-    } else {
-      return;
+      const container = trip.querySelector('.orders-list');
+      return { kind: 'trip', tripId: parseInt(trip.getAttribute('data-trip-id'), 10), container: container || trip };
     }
-    const r = await fetch('api/trip_order.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(params) });
+    const un = under.closest('#unassignedZone');
+    if (un) return { kind: 'un', container: un };
+    return null;
+  }
+  const zone = under.closest('[data-zone-drop]');
+  if (zone) {
+    const container = zone.querySelector('.zone-vehicles');
+    return { kind: 'zone', zoneId: parseInt(zone.getAttribute('data-zone-drop'), 10), container: container || zone };
+  }
+  return null;
+}
+function ddStart(el, isOrder, e) {
+  ddDrag = {
+    isOrder: isOrder,
+    el: el,
+    info: isOrder
+      ? { order_id: parseInt(el.getAttribute('data-order-id'), 10), from_trip: el.getAttribute('data-from-trip') || null }
+      : { vehicle_id: parseInt(el.getAttribute('data-vehicle-id'), 10), from_zone: parseInt(el.getAttribute('data-zone-id'), 10) },
+    ghost: ddGhost(el),
+    target: null
+  };
+  el.classList.add('dd-source');
+  document.body.classList.add('dd-dragging');
+  ddMoveGhost(e);
+}
+async function ddFinish(e) {
+  const drag = ddDrag;
+  ddDrag = null;
+  ddPotential = null;
+  document.body.classList.remove('dd-dragging');
+  if (drag.el) drag.el.classList.remove('dd-source');
+  if (drag.ghost && drag.ghost.parentNode) drag.ghost.parentNode.removeChild(drag.ghost);
+  ddClearGap();
+
+  let target = drag.target;
+  if (!target) target = ddDropTarget(e);
+  if (!target) return;
+  const info = drag.info;
+  try {
+    let params, url;
+    if (drag.isOrder) {
+      if (target.kind === 'trip') {
+        const toTrip = target.tripId;
+        if (info.from_trip && parseInt(info.from_trip, 10) === toTrip) {
+          params = { action: 'reorder', trip_id: toTrip, order_ids: ddBuildOrderList(target.container, info.order_id, e.clientY) };
+        } else {
+          params = { action: info.from_trip ? 'move' : 'add', order_id: info.order_id, from_trip_id: info.from_trip, to_trip_id: toTrip };
+        }
+        url = 'api/trip_order.php';
+      } else if (target.kind === 'un') {
+        if (!info.from_trip) return;
+        params = { action: 'remove', order_id: info.order_id, trip_id: parseInt(info.from_trip, 10) };
+        url = 'api/trip_order.php';
+      } else {
+        return;
+      }
+    } else {
+      if (target.kind !== 'zone') return;
+      if (parseInt(info.from_zone, 10) === target.zoneId) return;
+      params = { action: 'move', vehicle_id: info.vehicle_id, zone_id: target.zoneId };
+      url = 'api/vehicle_zone.php';
+    }
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(params) });
     const d = await r.json();
     if (!d.ok) throw new Error(d.error || 'error');
     location.reload();
   } catch (err) { alert(err.message); }
-});
+}
+function ddBuildOrderList(container, orderId, y) {
+  const all = Array.from(container.querySelectorAll(':scope > .drag-order'));
+  const ids = all.map(function (el) { return parseInt(el.getAttribute('data-order-id'), 10); });
+  const fi = ids.indexOf(orderId);
+  if (fi !== -1) ids.splice(fi, 1);
+  const rest = all.filter(function (el) { return parseInt(el.getAttribute('data-order-id'), 10) !== orderId; });
+  let ins = ids.length;
+  for (let i = 0; i < rest.length; i++) {
+    const rr = rest[i].getBoundingClientRect();
+    if (y < rr.top + rr.height / 2) { ins = i; break; }
+    ins = i + 1;
+  }
+  ids.splice(ins, 0, orderId);
+  return ids;
+}
 
-document.addEventListener('dragend', function () {
-  dragItem = null;
-  document.querySelectorAll('[data-zone-drop].drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
+document.addEventListener('mousedown', function (e) {
+  if (e.button !== 0) return;
+  const ord = e.target.closest('.drag-order');
+  const chip = e.target.closest('.veh-chip');
+  if (!ord && !chip) return;
+  ddPotential = { el: ord || chip, isOrder: !!ord, x: e.clientX, y: e.clientY };
+});
+document.addEventListener('mousemove', function (e) {
+  if (ddPotential && !ddDrag) {
+    if (Math.abs(e.clientX - ddPotential.x) + Math.abs(e.clientY - ddPotential.y) > 6) {
+      ddStart(ddPotential.el, ddPotential.isOrder, e);
+      ddPotential = null;
+    }
+  }
+  if (!ddDrag) return;
+  e.preventDefault();
+  ddMoveGhost(e);
+  const t = ddDropTarget(e);
+  ddDrag.target = t;
+  ddClearGap();
+  if (t && t.container) {
+    const items = ddItems(t.container);
+    ddShowGap(t.container, ddInsertBefore(items, e.clientY));
+  }
+});
+document.addEventListener('mouseup', function (e) {
+  if (ddPotential) ddPotential = null;
+  if (!ddDrag) return;
+  ddFinish(e);
 });
 
 // Свернуть / развернуть рейс
