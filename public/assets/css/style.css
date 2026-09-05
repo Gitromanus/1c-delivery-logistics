@@ -45,7 +45,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
 .grid {
   display: grid;
-  grid-template-columns: 260px 1fr 340px;
+  grid-template-columns: 240px minmax(0,1fr) 300px 340px;
   gap: 16px;
 }
 @media (max-width: 1000px) {

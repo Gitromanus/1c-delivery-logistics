@@ -148,8 +148,10 @@ function h(?string $s): string
           <?php endif; ?>
         </p>
       <?php endif; ?>
+    </section>
 
-      <h2 style="margin-top:16px">Нераспределённые</h2>
+    <section class="panel">
+      <h2>Нераспределённые</h2>
       <div id="unassignedZone" style="min-height:72px;border:2px dashed #2f3546;border-radius:10px;padding:8px;background:#14161f;">
         <?php if (!$freeOrders): ?>
           <p class="muted" style="text-align:center;padding:8px 0">Пусто — перетащите заявку сюда из рейса</p>
