@@ -425,6 +425,19 @@ function refreshZone(zoneEl) {
     cap += parseFloat(ch.getAttribute('data-cap')) || 0;
     n++;
   });
+  // Показываем/убираем надпись «нет машин»
+  const vc = zoneEl.querySelector('.zone-vehicles');
+  if (vc) {
+    const empty = vc.querySelector(':scope > .zone-empty');
+    if (n === 0 && !empty) {
+      const s = document.createElement('span');
+      s.className = 'muted zone-empty';
+      s.textContent = 'нет машин';
+      vc.appendChild(s);
+    } else if (n > 0 && empty) {
+      empty.parentNode.removeChild(empty);
+    }
+  }
   const orderW = parseFloat(zoneEl.getAttribute('data-order-w')) || 0;
   const pct = cap > 0 ? Math.min(100, Math.round(orderW / cap * 100)) : 0;
   const bar = zoneEl.querySelector('.bar');
