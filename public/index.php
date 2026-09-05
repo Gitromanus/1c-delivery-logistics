@@ -113,9 +113,9 @@ function h(?string $s): string
     </div>
   </header>
 
-  <div class="grid">
-    <section class="panel">
-      <h2>Зоны на <?= h($date) ?></h2>
+  <section class="panel zones-bar">
+    <h2>Зоны на <?= h($date) ?></h2>
+    <div class="zones-row">
       <?php foreach ($zones as $z):
           $st = $stats[$z['id']] ?? ['cnt' => 0, 'weight' => 0];
           $cnt = (int) $st['cnt'];
@@ -132,8 +132,10 @@ function h(?string $s): string
           <?php endif; ?>
         </div>
       <?php endforeach; ?>
-    </section>
+    </div>
+  </section>
 
+  <div class="grid">
     <section class="panel map-panel">
       <h2>Карта заявок</h2>
       <?php if ($yandexKey === ''): ?>
