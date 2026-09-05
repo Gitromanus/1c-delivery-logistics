@@ -153,7 +153,7 @@ function h(?string $s): string
           <div class="zone-cap">Загружено: <?= number_format($w, 0, '.', ' ') ?> / <?= number_format($totCap, 0, '.', ' ') ?> кг · машин: <?= count($zv) ?></div>
           <div class="zone-vehicles">
             <?php foreach ($zv as $vv): ?>
-              <div class="veh-chip" draggable="true" data-vehicle-id="<?= (int) $vv['vehicle_id'] ?>" data-zone-id="<?= (int) $z['id'] ?>" title="Перетащите в другую зону">
+              <div class="veh-chip" data-vehicle-id="<?= (int) $vv['vehicle_id'] ?>" data-zone-id="<?= (int) $z['id'] ?>" title="Перетащите в другую зону">
                 <span class="veh-name"><?= h($vv['name']) ?></span>
                 <span class="veh-cap"><?= number_format((float) $vv['capacity_kg'], 0, '.', ' ') ?> кг</span>
               </div>
@@ -187,7 +187,7 @@ function h(?string $s): string
           <p class="muted" style="text-align:center;padding:8px 0">Пусто — перетащите заявку сюда из рейса</p>
         <?php else: ?>
           <?php foreach ($freeOrders as $o): ?>
-            <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="" draggable="true"
+            <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip=""
                  style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2f3546;border-radius:8px;margin-bottom:6px;background:#1c2130;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.25)">
               <div style="min-width:0;flex:1">
                 <div style="font-weight:700;font-size:14px;color:#f1f3f7;line-height:1.25"><?= h($o['number'] ?: $o['external_id']) ?></div>
@@ -227,7 +227,7 @@ function h(?string $s): string
           <div class="trip-body">
             <div class="orders-list" style="margin-top:8px">
               <?php foreach ($list as $o): ?>
-                <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="<?= (int) $t['id'] ?>" draggable="true"
+                <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="<?= (int) $t['id'] ?>"
                      style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2f3546;border-radius:8px;margin-bottom:6px;background:#1c2130;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.25)">
                   <div style="min-width:0;flex:1">
                     <div style="font-weight:700;font-size:14px;color:#f1f3f7;line-height:1.25"><?= h($o['number'] ?: $o['external_id']) ?></div>
