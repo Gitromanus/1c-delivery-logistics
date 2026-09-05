@@ -98,6 +98,14 @@ function h(?string $s): string
 {
     return htmlspecialchars((string) $s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
+
+// Русские подписи статусов рейсов
+$tripStatusLabels = [
+    'draft' => 'Черновик',
+    'confirmed' => 'Подтверждён',
+    'done' => 'Выполнен',
+    'cancelled' => 'Отменён',
+];
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -144,9 +152,9 @@ function h(?string $s): string
           <div class="name"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:<?= h($zcolor) ?>;margin-right:6px;vertical-align:middle"></span><?= h($z['name']) ?></div>
           <div class="meta"><?= $cnt ?> заявок · <?= number_format($w, 0, '.', ' ') ?> кг</div>
           <?php if ($cnt === 0): ?>
-            <span class="badge badge-ok">Пусто</span>
+            <span class="badge badge-ok badge-corner">Пусто</span>
           <?php else: ?>
-            <span class="badge badge-ok">В работе</span>
+            <span class="badge badge-ok badge-corner">В работе</span>
           <?php endif; ?>
           <?php $zpct = $totCap > 0 ? min(100, round($w / $totCap * 100)) : 0; ?>
           <div class="bar <?= $w > $totCap + 0.01 ? 'over' : '' ?>"><i style="width:<?= $zpct ?>%"></i></div>
@@ -218,10 +226,10 @@ function h(?string $s): string
           ?>
         <div class="trip" data-trip-id="<?= (int) $t['id'] ?>" data-cap="<?= $cap ?>">
           <div class="title">
-            <span><?= h($t['vehicle_name']) ?><?= (!empty($t['plate']) && stripos((string) $t['vehicle_name'], (string) $t['plate']) === false) ? ' · ' . h($t['plate']) : '' ?></span>
+            <span><?= h($t['vehicle_name']) ?><?= $t['plate'] ? ' · ' . h($t['plate']) : '' ?></span>
             <button type="button" class="trip-toggle" aria-label="Свернуть/развернуть" title="Свернуть/развернуть">▾</button>
           </div>
-          <div class="muted"><?= h($t['zone_name'] ?: 'Зона не указана') ?> · <?= h($t['status']) ?></div>
+          <div class="muted"><?= h($t['zone_name'] ?: 'Зона не указана') ?> · <?= h($tripStatusLabels[$t['status']] ?? $t['status']) ?></div>
           <div class="bar <?= $over ? 'over' : '' ?>"><i style="width:<?= $pct ?>%"></i></div>
           <div class="muted trip-weight"><?= number_format($sum, 0, '.', ' ') ?> / <?= number_format($cap, 0, '.', ' ') ?> кг</div>
           <div class="trip-body">
