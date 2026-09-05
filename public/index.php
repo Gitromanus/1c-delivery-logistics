@@ -58,6 +58,19 @@ if ($trips) {
     }
 }
 
+// Машины по зонам (из привязок vehicle_zones)
+$vehZoneRows = $pdo->query(
+    "SELECT vz.zone_id, v.id AS vehicle_id, v.name, v.capacity_kg
+     FROM vehicle_zones vz
+     JOIN vehicles v ON v.id = vz.vehicle_id
+     WHERE v.is_active = 1
+     ORDER BY v.name"
+)->fetchAll();
+$vehByZone = [];
+foreach ($vehZoneRows as $vr) {
+    $vehByZone[(int) $vr['zone_id']][] = $vr;
+}
+
 $unassigned = $pdo->prepare(
     "SELECT * FROM orders WHERE doc_date = ? AND status = 'new' ORDER BY id DESC LIMIT 100"
 );
@@ -122,7 +135,12 @@ function h(?string $s): string
           $w = (float) $st['weight'];
           $zcolor = !empty($z['poly_color']) ? $z['poly_color'] : '#1a73e8';
           ?>
-        <div class="zone-card" style="border-left:6px solid <?= h($zcolor) ?>">
+        <?php
+          $zv = $vehByZone[$z['id']] ?? [];
+          $totCap = 0;
+          foreach ($zv as $vv) { $totCap += (float) $vv['capacity_kg']; }
+        ?>
+        <div class="zone-card" data-zone-drop="<?= (int) $z['id'] ?>" style="border-left:6px solid <?= h($zcolor) ?>">
           <div class="name"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:<?= h($zcolor) ?>;margin-right:6px;vertical-align:middle"></span><?= h($z['name']) ?></div>
           <div class="meta"><?= $cnt ?> заявок · <?= number_format($w, 0, '.', ' ') ?> кг</div>
           <?php if ($cnt === 0): ?>
@@ -130,6 +148,18 @@ function h(?string $s): string
           <?php else: ?>
             <span class="badge badge-ok">В работе</span>
           <?php endif; ?>
+          <div class="zone-cap">Машин: <?= count($zv) ?> · Грузоподъёмность: <?= number_format($totCap, 0, '.', ' ') ?> кг</div>
+          <div class="zone-vehicles">
+            <?php foreach ($zv as $vv): ?>
+              <div class="veh-chip" draggable="true" data-vehicle-id="<?= (int) $vv['vehicle_id'] ?>" data-zone-id="<?= (int) $z['id'] ?>" title="Перетащите в другую зону">
+                <span class="veh-name"><?= h($vv['name']) ?></span>
+                <span class="veh-cap"><?= number_format((float) $vv['capacity_kg'], 0, '.', ' ') ?> кг</span>
+              </div>
+            <?php endforeach; ?>
+            <?php if (!$zv): ?>
+              <span class="muted zone-empty">нет машин</span>
+            <?php endif; ?>
+          </div>
         </div>
       <?php endforeach; ?>
     </section>
@@ -185,24 +215,29 @@ function h(?string $s): string
           $over = $sum > $cap + 0.01;
           ?>
         <div class="trip" data-trip-id="<?= (int) $t['id'] ?>">
-          <div class="title"><?= h($t['vehicle_name']) ?><?= $t['plate'] ? ' · ' . h($t['plate']) : '' ?></div>
-          <div class="muted"><?= h($t['zone_name'] ?: 'Зона не указана') ?> · <?= h($t['status']) ?></div>
-          <div class="bar <?= $over ? 'over' : '' ?>"><i style="width:<?= $pct ?>%"></i></div>
-          <div class="muted"><?= number_format($sum, 0, '.', ' ') ?> / <?= number_format($cap, 0, '.', ' ') ?> кг</div>
-          <div style="margin-top:8px">
-            <?php foreach ($list as $o): ?>
-              <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="<?= (int) $t['id'] ?>" draggable="true"
-                   style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2f3546;border-radius:8px;margin-bottom:6px;background:#1c2130;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.25)">
-                <div style="min-width:0;flex:1">
-                  <div style="font-weight:700;font-size:14px;color:#f1f3f7;line-height:1.25"><?= h($o['number'] ?: $o['external_id']) ?></div>
-                  <div style="font-size:12px;color:#9aa0a6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= h($o['address']) ?></div>
-                  <?php if (!empty($o['partner'])): ?>
-                  <div style="font-size:12px;color:#b6bcc6;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px"><?= h($o['partner']) ?></div>
-                  <?php endif; ?>
+          <div class="title">
+            <span><?= h($t['vehicle_name']) ?><?= $t['plate'] ? ' · ' . h($t['plate']) : '' ?></span>
+            <button type="button" class="trip-toggle" aria-label="Свернуть/развернуть" title="Свернуть/развернуть">▾</button>
+          </div>
+          <div class="trip-body">
+            <div class="muted"><?= h($t['zone_name'] ?: 'Зона не указана') ?> · <?= h($t['status']) ?></div>
+            <div class="bar <?= $over ? 'over' : '' ?>"><i style="width:<?= $pct ?>%"></i></div>
+            <div class="muted"><?= number_format($sum, 0, '.', ' ') ?> / <?= number_format($cap, 0, '.', ' ') ?> кг</div>
+            <div style="margin-top:8px">
+              <?php foreach ($list as $o): ?>
+                <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="<?= (int) $t['id'] ?>" draggable="true"
+                     style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2f3546;border-radius:8px;margin-bottom:6px;background:#1c2130;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.25)">
+                  <div style="min-width:0;flex:1">
+                    <div style="font-weight:700;font-size:14px;color:#f1f3f7;line-height:1.25"><?= h($o['number'] ?: $o['external_id']) ?></div>
+                    <div style="font-size:12px;color:#9aa0a6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= h($o['address']) ?></div>
+                    <?php if (!empty($o['partner'])): ?>
+                    <div style="font-size:12px;color:#b6bcc6;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px"><?= h($o['partner']) ?></div>
+                    <?php endif; ?>
+                  </div>
+                  <span style="flex:0 0 auto;font-size:12px;font-weight:700;background:#2b3245;color:#dfe3ea;border-radius:20px;padding:3px 10px"><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?> кг</span>
                 </div>
-                <span style="flex:0 0 auto;font-size:12px;font-weight:700;background:#2b3245;color:#dfe3ea;border-radius:20px;padding:3px 10px"><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?> кг</span>
-              </div>
-            <?php endforeach; ?>
+              <?php endforeach; ?>
+            </div>
           </div>
         </div>
       <?php endforeach; ?>
@@ -272,31 +307,72 @@ document.getElementById('rebuildBtn').addEventListener('click', async () => {
   }
 });
 
-// Drag & drop заявок между рейсами и «нераспределёнными»
-let dragOrder = null;
+// Drag & drop заявок (между рейсами/нераспределёнными) и машин (между зонами)
+let dragItem = null;
+
 document.addEventListener('dragstart', function (e) {
+  // Машина — перенос между зонами
+  const chip = e.target.closest('.veh-chip');
+  if (chip) {
+    dragItem = {
+      type: 'veh',
+      vehicle_id: parseInt(chip.getAttribute('data-vehicle-id'), 10),
+      from_zone: parseInt(chip.getAttribute('data-zone-id'), 10)
+    };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', 'veh' + dragItem.vehicle_id);
+    return;
+  }
+  // Заявка
   const tr = e.target.closest('.drag-order');
-  if (!tr) { dragOrder = null; return; }
-  dragOrder = {
+  if (!tr) { dragItem = null; return; }
+  dragItem = {
+    type: 'order',
     order_id: parseInt(tr.getAttribute('data-order-id'), 10),
     from_trip: tr.getAttribute('data-from-trip') || null
   };
   e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', String(dragOrder.order_id));
+  e.dataTransfer.setData('text/plain', String(dragItem.order_id));
 });
+
 document.addEventListener('dragover', function (e) {
   const trip = e.target.closest('[data-trip-id]');
   const un = e.target.closest('#unassignedZone');
-  if (trip || un) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+  const zone = e.target.closest('[data-zone-drop]');
+  if (trip || un || zone) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+  if (zone && dragItem && dragItem.type === 'veh') {
+    document.querySelectorAll('[data-zone-drop].drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
+    zone.classList.add('drag-over');
+  }
 });
+
 document.addEventListener('drop', async function (e) {
+  if (!dragItem) return;
+  e.preventDefault();
+  const item = dragItem;
+  dragItem = null;
+  document.querySelectorAll('[data-zone-drop].drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
+
+  // Перенос машины между зонами
+  if (item.type === 'veh') {
+    const zone = e.target.closest('[data-zone-drop]');
+    if (!zone) return;
+    const toZone = parseInt(zone.getAttribute('data-zone-drop'), 10);
+    if (item.from_zone === toZone) return;
+    try {
+      const r = await fetch('api/vehicle_zone.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'move', vehicle_id: item.vehicle_id, zone_id: toZone }) });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error || 'error');
+      location.reload();
+    } catch (err) { alert(err.message); }
+    return;
+  }
+
+  // Перенос заявки
   const trip = e.target.closest('[data-trip-id]');
   const un = e.target.closest('#unassignedZone');
-  if (!dragOrder) return;
-  e.preventDefault();
-  const orderId = dragOrder.order_id;
-  const fromTrip = dragOrder.from_trip;
-  dragOrder = null;
+  const orderId = item.order_id;
+  const fromTrip = item.from_trip;
   try {
     let params;
     if (trip) {
@@ -314,6 +390,21 @@ document.addEventListener('drop', async function (e) {
     if (!d.ok) throw new Error(d.error || 'error');
     location.reload();
   } catch (err) { alert(err.message); }
+});
+
+document.addEventListener('dragend', function () {
+  dragItem = null;
+  document.querySelectorAll('[data-zone-drop].drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
+});
+
+// Свернуть / развернуть рейс
+document.addEventListener('click', function (e) {
+  const btn = e.target.closest('.trip-toggle');
+  if (!btn) return;
+  const trip = btn.closest('.trip');
+  if (!trip) return;
+  const collapsed = trip.classList.toggle('collapsed');
+  btn.textContent = collapsed ? '▸' : '▾';
 });
 
 // Связка «карточка заказа ↔ точка на карте»
