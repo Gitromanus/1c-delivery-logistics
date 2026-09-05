@@ -312,6 +312,39 @@ document.getElementById('rebuildBtn').addEventListener('click', async () => {
 // Drag & drop заявок (между рейсами/нераспределёнными) и машин (между зонами)
 let dragItem = null;
 
+// Рисуем непрозрачную копию перетаскиваемой карточки вместо полупрозрачного нативного образа
+function setOpaqueDragImage(e, el) {
+  try {
+    const rect = el.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
+    const clone = el.cloneNode(true);
+    clone.style.position = 'absolute';
+    clone.style.left = '-9999px';
+    clone.style.top = '0';
+    clone.style.width = w + 'px';
+    clone.style.margin = '0';
+    clone.style.boxShadow = 'none';
+    document.body.appendChild(clone);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const bg = window.getComputedStyle(el).backgroundColor;
+    ctx.fillStyle = (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') ? bg : '#1c2130';
+    ctx.fillRect(0, 0, w, h);
+    const xml = new XMLSerializer().serializeToString(clone);
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '"><foreignObject width="100%" height="100%">' + xml + '</foreignObject></svg>';
+    const img = new Image();
+    img.onload = function () {
+      try { ctx.drawImage(img, 0, 0); } catch (err) {}
+      try { e.dataTransfer.setDragImage(canvas, Math.min(24, w / 2), 12); } catch (err2) {}
+      document.body.removeChild(clone);
+    };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  } catch (err) {}
+}
+
 document.addEventListener('dragstart', function (e) {
   // Машина — перенос между зонами
   const chip = e.target.closest('.veh-chip');
@@ -323,6 +356,7 @@ document.addEventListener('dragstart', function (e) {
     };
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', 'veh' + dragItem.vehicle_id);
+    setOpaqueDragImage(e, chip);
     return;
   }
   // Заявка
@@ -335,6 +369,7 @@ document.addEventListener('dragstart', function (e) {
   };
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', String(dragItem.order_id));
+  setOpaqueDragImage(e, tr);
 });
 
 document.addEventListener('dragover', function (e) {
@@ -379,8 +414,20 @@ document.addEventListener('drop', async function (e) {
     let params;
     if (trip) {
       const toTrip = parseInt(trip.getAttribute('data-trip-id'), 10);
-      if (fromTrip && parseInt(fromTrip, 10) === toTrip) return;
-      params = { action: fromTrip ? 'move' : 'add', order_id: orderId, from_trip_id: fromTrip, to_trip_id: toTrip };
+      if (fromTrip && parseInt(fromTrip, 10) === toTrip) {
+        // Перестановка внутри рейса — вручную меняем порядок заявок
+        const targ = e.target.closest('.drag-order');
+        if (!targ) return;
+        const list = Array.from(trip.querySelectorAll('.drag-order')).map(function (el) { return parseInt(el.getAttribute('data-order-id'), 10); });
+        const fi = list.indexOf(orderId);
+        const ti = list.indexOf(parseInt(targ.getAttribute('data-order-id'), 10));
+        if (fi === -1 || ti === -1) return;
+        list.splice(fi, 1);
+        list.splice(list.indexOf(parseInt(targ.getAttribute('data-order-id'), 10)), 0, orderId);
+        params = { action: 'reorder', trip_id: toTrip, order_ids: list };
+      } else {
+        params = { action: fromTrip ? 'move' : 'add', order_id: orderId, from_trip_id: fromTrip, to_trip_id: toTrip };
+      }
     } else if (un) {
       if (!fromTrip) return;
       params = { action: 'remove', order_id: orderId, trip_id: parseInt(fromTrip, 10) };
