@@ -45,7 +45,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
 .grid {
   display: grid;
-  grid-template-columns: minmax(0,1fr) 300px 340px;
+  grid-template-columns: 260px minmax(0,1fr) 340px;
   gap: 16px;
 }
 @media (max-width: 1000px) {
@@ -54,12 +54,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 
 /* Рабочий стол: растянут на всю ширину экрана */
 .app.wide { max-width: none; padding-top: 12px; }
-.app.wide .map-box { height: 52vh; min-height: 380px; }
-
-/* Зоны — горизонтальная полоса сверху */
-.zones-bar { margin-bottom: 16px; }
-.zones-bar .zones-row { display: flex; flex-wrap: wrap; gap: 10px; }
-.zones-bar .zone-card { flex: 1 1 220px; min-width: 180px; margin-bottom: 0; }
+.app.wide .map-box { height: 48vh; min-height: 360px; }
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);

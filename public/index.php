@@ -113,9 +113,9 @@ function h(?string $s): string
     </div>
   </header>
 
-  <section class="panel zones-bar">
-    <h2>Зоны на <?= h($date) ?></h2>
-    <div class="zones-row">
+  <div class="grid">
+    <section class="panel">
+      <h2>Зоны на <?= h($date) ?></h2>
       <?php foreach ($zones as $z):
           $st = $stats[$z['id']] ?? ['cnt' => 0, 'weight' => 0];
           $cnt = (int) $st['cnt'];
@@ -132,10 +132,8 @@ function h(?string $s): string
           <?php endif; ?>
         </div>
       <?php endforeach; ?>
-    </div>
-  </section>
+    </section>
 
-  <div class="grid">
     <section class="panel map-panel">
       <h2>Карта заявок</h2>
       <?php if ($yandexKey === ''): ?>
@@ -150,10 +148,8 @@ function h(?string $s): string
           <?php endif; ?>
         </p>
       <?php endif; ?>
-    </section>
 
-    <section class="panel">
-      <h2>Нераспределённые</h2>
+      <h2 style="margin-top:16px">Нераспределённые</h2>
       <div id="unassignedZone" style="min-height:72px;border:2px dashed #2f3546;border-radius:10px;padding:8px;background:#14161f;">
         <?php if (!$freeOrders): ?>
           <p class="muted" style="text-align:center;padding:8px 0">Пусто — перетащите заявку сюда из рейса</p>
