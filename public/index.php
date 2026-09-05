@@ -98,7 +98,7 @@ function h(?string $s): string
   <?php endif; ?>
 </head>
 <body>
-<div class="app desk-app">
+<div class="app dash-app">
   <header class="header">
     <div class="logo"><span>◆</span> Логистика доставки</div>
     <div class="toolbar">
@@ -113,8 +113,8 @@ function h(?string $s): string
     </div>
   </header>
 
-  <div class="desk">
-    <section class="panel map-panel desk-map">
+  <div class="dash">
+    <section class="panel map-panel dash-map">
       <h2>Карта заявок · <?= h($date) ?></h2>
       <?php if ($yandexKey === ''): ?>
         <p class="muted">Укажите <code>yandex_maps_key</code> в config.php</p>
@@ -130,30 +130,32 @@ function h(?string $s): string
       <?php endif; ?>
     </section>
 
-    <aside class="desk-side">
-      <section class="panel">
+    <div class="dash-cols">
+      <section class="panel dash-col">
         <h2>Зоны на <?= h($date) ?></h2>
-        <?php foreach ($zones as $z):
-            $st = $stats[$z['id']] ?? ['cnt' => 0, 'weight' => 0];
-            $cnt = (int) $st['cnt'];
-            $w = (float) $st['weight'];
-            $zcolor = !empty($z['poly_color']) ? $z['poly_color'] : '#1a73e8';
-            ?>
-          <div class="zone-card" style="border-left:6px solid <?= h($zcolor) ?>">
-            <div class="name"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:<?= h($zcolor) ?>;margin-right:6px;vertical-align:middle"></span><?= h($z['name']) ?></div>
-            <div class="meta"><?= $cnt ?> заявок · <?= number_format($w, 0, '.', ' ') ?> кг</div>
-            <?php if ($cnt === 0): ?>
-              <span class="badge badge-ok">Пусто</span>
-            <?php else: ?>
-              <span class="badge badge-ok">В работе</span>
-            <?php endif; ?>
-          </div>
-        <?php endforeach; ?>
+        <div class="col-body">
+          <?php foreach ($zones as $z):
+              $st = $stats[$z['id']] ?? ['cnt' => 0, 'weight' => 0];
+              $cnt = (int) $st['cnt'];
+              $w = (float) $st['weight'];
+              $zcolor = !empty($z['poly_color']) ? $z['poly_color'] : '#1a73e8';
+              ?>
+            <div class="zone-card" style="border-left:6px solid <?= h($zcolor) ?>">
+              <div class="name"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:<?= h($zcolor) ?>;margin-right:6px;vertical-align:middle"></span><?= h($z['name']) ?></div>
+              <div class="meta"><?= $cnt ?> заявок · <?= number_format($w, 0, '.', ' ') ?> кг</div>
+              <?php if ($cnt === 0): ?>
+                <span class="badge badge-ok">Пусто</span>
+              <?php else: ?>
+                <span class="badge badge-ok">В работе</span>
+              <?php endif; ?>
+            </div>
+          <?php endforeach; ?>
+        </div>
       </section>
 
-      <section class="panel">
+      <section class="panel dash-col">
         <h2>Нераспределённые</h2>
-        <div id="unassignedZone" style="min-height:72px;border:2px dashed #2f3546;border-radius:10px;padding:8px;background:#14161f;">
+        <div class="col-body" id="unassignedZone">
           <?php if (!$freeOrders): ?>
             <p class="muted" style="text-align:center;padding:8px 0">Пусто — перетащите заявку сюда из рейса</p>
           <?php else: ?>
@@ -174,43 +176,45 @@ function h(?string $s): string
         </div>
       </section>
 
-      <section class="panel">
+      <section class="panel dash-col">
         <h2>Рейсы</h2>
-        <?php if (!$trips): ?>
-          <p class="muted">Рейсов нет. Нажмите «Пересобрать рейсы».</p>
-        <?php endif; ?>
-        <?php foreach ($trips as $t):
-            $list = $itemsByTrip[$t['id']] ?? [];
-            $sum = 0;
-            foreach ($list as $o) { $sum += (float) $o['weight_kg']; }
-            $cap = (float) $t['capacity_kg'];
-            $pct = $cap > 0 ? min(100, round($sum / $cap * 100)) : 0;
-            $over = $sum > $cap + 0.01;
-            ?>
-          <div class="trip" data-trip-id="<?= (int) $t['id'] ?>">
-            <div class="title"><?= h($t['vehicle_name']) ?><?= $t['plate'] ? ' · ' . h($t['plate']) : '' ?></div>
-            <div class="muted"><?= h($t['zone_name'] ?: 'Зона не указана') ?> · <?= h($t['status']) ?></div>
-            <div class="bar <?= $over ? 'over' : '' ?>"><i style="width:<?= $pct ?>%"></i></div>
-            <div class="muted"><?= number_format($sum, 0, '.', ' ') ?> / <?= number_format($cap, 0, '.', ' ') ?> кг</div>
-            <div style="margin-top:8px">
-              <?php foreach ($list as $o): ?>
-                <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="<?= (int) $t['id'] ?>" draggable="true"
-                     style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2f3546;border-radius:8px;margin-bottom:6px;background:#1c2130;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.25)">
-                  <div style="min-width:0;flex:1">
-                    <div style="font-weight:700;font-size:14px;color:#f1f3f7;line-height:1.25"><?= h($o['number'] ?: $o['external_id']) ?></div>
-                    <div style="font-size:12px;color:#9aa0a6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= h($o['address']) ?></div>
-                    <?php if (!empty($o['partner'])): ?>
-                    <div style="font-size:12px;color:#b6bcc6;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px"><?= h($o['partner']) ?></div>
-                    <?php endif; ?>
+        <div class="col-body">
+          <?php if (!$trips): ?>
+            <p class="muted">Рейсов нет. Нажмите «Пересобрать рейсы».</p>
+          <?php endif; ?>
+          <?php foreach ($trips as $t):
+              $list = $itemsByTrip[$t['id']] ?? [];
+              $sum = 0;
+              foreach ($list as $o) { $sum += (float) $o['weight_kg']; }
+              $cap = (float) $t['capacity_kg'];
+              $pct = $cap > 0 ? min(100, round($sum / $cap * 100)) : 0;
+              $over = $sum > $cap + 0.01;
+              ?>
+            <div class="trip" data-trip-id="<?= (int) $t['id'] ?>">
+              <div class="title"><?= h($t['vehicle_name']) ?><?= $t['plate'] ? ' · ' . h($t['plate']) : '' ?></div>
+              <div class="muted"><?= h($t['zone_name'] ?: 'Зона не указана') ?> · <?= h($t['status']) ?></div>
+              <div class="bar <?= $over ? 'over' : '' ?>"><i style="width:<?= $pct ?>%"></i></div>
+              <div class="muted"><?= number_format($sum, 0, '.', ' ') ?> / <?= number_format($cap, 0, '.', ' ') ?> кг</div>
+              <div style="margin-top:8px">
+                <?php foreach ($list as $o): ?>
+                  <div class="drag-order" data-order-id="<?= (int) $o['id'] ?>" data-from-trip="<?= (int) $t['id'] ?>" draggable="true"
+                       style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #2f3546;border-radius:8px;margin-bottom:6px;background:#1c2130;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.25)">
+                    <div style="min-width:0;flex:1">
+                      <div style="font-weight:700;font-size:14px;color:#f1f3f7;line-height:1.25"><?= h($o['number'] ?: $o['external_id']) ?></div>
+                      <div style="font-size:12px;color:#9aa0a6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= h($o['address']) ?></div>
+                      <?php if (!empty($o['partner'])): ?>
+                      <div style="font-size:12px;color:#b6bcc6;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px"><?= h($o['partner']) ?></div>
+                      <?php endif; ?>
+                    </div>
+                    <span style="flex:0 0 auto;font-size:12px;font-weight:700;background:#2b3245;color:#dfe3ea;border-radius:20px;padding:3px 10px"><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?> кг</span>
                   </div>
-                  <span style="flex:0 0 auto;font-size:12px;font-weight:700;background:#2b3245;color:#dfe3ea;border-radius:20px;padding:3px 10px"><?= number_format((float) $o['weight_kg'], 0, '.', ' ') ?> кг</span>
-                </div>
-              <?php endforeach; ?>
+                <?php endforeach; ?>
+              </div>
             </div>
-          </div>
-        <?php endforeach; ?>
+          <?php endforeach; ?>
+        </div>
       </section>
-    </aside>
+    </div>
   </div>
   <footer class="footer">УТ 11 · Agent+</footer>
 </div>
