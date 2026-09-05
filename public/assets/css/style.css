@@ -177,3 +177,26 @@ code { color: var(--accent); font-size: 0.85em; }
 .modal label { display: block; color: var(--muted); font-size: 0.8rem; margin: 12px 0 4px; }
 .modal input[type="text"], .modal input[type="number"], .modal select { width: 100%; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+
+/* Нераспределённые заявки: компактные карточки в 2 колонки */
+#unassignedZone {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+#unassignedZone .drag-order {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px !important;
+  margin-bottom: 0 !important;
+}
+#unassignedZone .drag-order > div { min-width: 0; flex: 1; }
+#unassignedZone .drag-order > div > div { line-height: 1.15 !important; }
+#unassignedZone .drag-order > div > div:nth-child(1) { font-size: 12px !important; }
+#unassignedZone .drag-order > div > div:nth-child(2) { font-size: 11px !important; }
+#unassignedZone .drag-order > div > div:nth-child(3) { font-size: 11px !important; margin-top: 1px !important; }
+#unassignedZone .drag-order > span { font-size: 11px !important; padding: 2px 7px !important; }
+@media (max-width: 1300px) {
+  #unassignedZone { grid-template-columns: 1fr; }
+}
