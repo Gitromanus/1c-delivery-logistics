@@ -1,0 +1,13 @@
+<?php
+require __DIR__ . '/bootstrap.php';
+$config = require (defined('APP_ROOT') ? APP_ROOT : __DIR__) . '/config.php';
+$yandexKey = (string) ($config['yandex_maps_key'] ?? '');
+
+$pdo = Database::pdo();
+$date = $_GET['date'] ?? date('Y-m-d');
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+    $date = date('Y-m-d');
+}
+
+// RESTORED_MARKER_PART0 - temporary incomplete, full restore via git history preferred
+echo 'RESTORING';
