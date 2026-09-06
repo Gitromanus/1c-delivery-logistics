@@ -7,13 +7,11 @@ return [
         'pass' => 'your_db_password',
         'charset' => 'utf8mb4',
     ],
-    // Ключ для POST /api/orders.php из 1С (свой секрет, НЕ ключ Яндекса)
+    // Ключ для 1С (X-Api-Key). Можно api_key или ApiKey1s
     'api_key' => 'change-me-to-long-random-string',
-    // Ключ JavaScript API Яндекс.Карт (для карты на фронтенде)
+    // 'ApiKey1s' => 'тот-же-секрет',
     'yandex_maps_key' => '',
-    // Ключ HTTP API Геокодера (для серверного геокодинга). Если пусто — берётся yandex_maps_key
     'yandex_geocoder_key' => '',
-    // API-ключ Dadata (точный геокодинг по РФ, бесплатно ~10k/сутки). Регистрация на dadata.ru
     'dadata_token' => '',
     'admin_password' => 'admin',
     'timezone' => 'Europe/Moscow',
