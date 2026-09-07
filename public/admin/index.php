@@ -1,7 +1,4 @@
 <?php
-/**
- * Админка: UI в admin_app.full.php, скрипты подмешиваются в кэш.
- */
 $cache = __DIR__ . '/admin_app.full.php';
 
 if (!is_file($cache) || filesize($cache) < 5000) {
@@ -19,15 +16,13 @@ if (!is_file($cache) || filesize($cache) < 5000) {
             ],
         ]);
         $data = @file_get_contents($url, false, $ctx);
-        if ($data !== false && strlen($data) > 5000) {
-            break;
-        }
+        if ($data !== false && strlen($data) > 5000) break;
         $data = false;
     }
     if ($data === false) {
         http_response_code(500);
         header('Content-Type: text/plain; charset=utf-8');
-        echo "Не удалось загрузить admin UI с GitHub.\n";
+        echo "Не удалось загрузить admin UI.\n";
         exit;
     }
     file_put_contents($cache, $data);
@@ -38,35 +33,31 @@ $changed = false;
 
 if (strpos($html, 'theme.js') === false) {
     $needle = '<link rel="stylesheet" href="../assets/css/style.css">';
-    $inject = $needle . "\n  <script src=\"../assets/js/theme.js\"></script>";
     if (strpos($html, $needle) !== false) {
-        $html = str_replace($needle, $inject, $html);
+        $html = str_replace(
+            $needle,
+            $needle . "\n  <script src=\"../assets/js/theme.js\"></script>",
+            $html
+        );
         $changed = true;
     }
 }
 
 if (strpos($html, 'admin-settings.js') === false) {
     if (stripos($html, '</body>') !== false) {
-        $html = str_ireplace(
-            '</body>',
-            "  <script src=\"../assets/js/admin-settings.js?v=3\"></script>\n</body>",
-            $html
-        );
-        $changed = true;
+        $html = str_ireplace('</body>', "  <script src=\"../assets/js/admin-settings.js?v=4\"></script>\n</body>", $html);
     } else {
-        $html .= "\n<script src=\"../assets/js/admin-settings.js?v=3\"></script>\n";
-        $changed = true;
+        $html .= "\n<script src=\"../assets/js/admin-settings.js?v=4\"></script>\n";
     }
+    $changed = true;
 } else {
-    $newHtml = preg_replace('#admin-settings\.js(\?v=\d+)?#', 'admin-settings.js?v=3', $html);
+    $newHtml = preg_replace('#admin-settings\.js(\?v=\d+)?#', 'admin-settings.js?v=4', $html);
     if ($newHtml !== $html) {
         $html = $newHtml;
         $changed = true;
     }
 }
 
-if ($changed) {
-    file_put_contents($cache, $html);
-}
+if ($changed) file_put_contents($cache, $html);
 
 require $cache;

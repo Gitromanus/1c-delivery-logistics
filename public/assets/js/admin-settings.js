@@ -1,7 +1,7 @@
 /**
- * Админка v3:
- * - метки в шапке
- * - зоны | машины | привязки в один ряд без наложений
+ * Админка v4:
+ * - зоны | машины | привязки в один ряд
+ * - стиль меток — панель над «Полигоны зон»
  */
 (function () {
   var STYLE_KEY = 'logistics-marker-style';
@@ -31,46 +31,37 @@
     var css = document.createElement('style');
     css.id = 'admin-layout-css';
     css.textContent = [
-      '#adminMarkerStyleBlock{display:none!important;}',
-      '.admin-marker-wrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}',
-      '.admin-marker-wrap label{font-size:0.8rem;color:var(--muted);white-space:nowrap;}',
-      '.admin-marker-wrap select{max-width:180px;padding:8px 10px;font-size:0.85rem;}',
-      /* Ряд из трёх карточек */',
+      '.admin-marker-wrap-header{display:none!important;}',
       '.admin-grid-top{',
       '  display:grid!important;',
       '  grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)!important;',
       '  gap:16px!important;',
       '  width:100%!important;',
-      '  max-width:100%!important;',
       '  margin:0 0 16px!important;',
-      '  padding:0!important;',
       '  align-items:stretch!important;',
-      '  position:relative!important;',
-      '  clear:both!important;',
-      '  float:none!important;',
       '}',
       '.admin-grid-top > .panel{',
       '  position:relative!important;',
       '  float:none!important;',
-      '  left:auto!important;',
-      '  right:auto!important;',
-      '  top:auto!important;',
       '  width:auto!important;',
-      '  max-width:100%!important;',
       '  min-width:0!important;',
       '  margin:0!important;',
       '  box-sizing:border-box!important;',
       '  overflow:auto!important;',
-      '  grid-column:auto!important;',
-      '  grid-row:auto!important;',
       '}',
       '.admin-grid-top table{width:100%!important;table-layout:fixed;}',
-      '.admin-grid-top th,.admin-grid-top td{',
-      '  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;',
+      '.admin-grid-top th,.admin-grid-top td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+      '@media(max-width:1100px){.admin-grid-top{grid-template-columns:1fr!important;}}',
+      /* Панель меток над полигонами */',
+      '#adminMarkerStyleBlock{',
+      '  display:block!important;',
+      '  margin:0 0 16px!important;',
       '}',
-      '@media(max-width:1100px){',
-      '  .admin-grid-top{grid-template-columns:1fr!important;}',
-      '}'
+      '#adminMarkerStyleBlock .marker-row{',
+      '  display:flex;align-items:center;gap:12px;flex-wrap:wrap;',
+      '}',
+      '#adminMarkerStyleBlock label{font-size:0.85rem;color:var(--muted);}',
+      '#adminMarkerStyleBlock select{min-width:200px;padding:8px 12px;}'
     ].join('\n');
     document.head.appendChild(css);
   }
@@ -79,9 +70,8 @@
     var found = null;
     document.querySelectorAll('.panel').forEach(function (p) {
       if (found) return;
-      if (p.closest('.admin-grid-top')) return;
       var head = p.querySelector('.panel-head, h2, h3');
-      var t = head ? head.textContent : p.textContent.slice(0, 80);
+      var t = head ? head.textContent : '';
       if (re.test(t || '')) found = p;
     });
     return found;
@@ -93,11 +83,9 @@
     var binds = findPanelByTitle(/Привяз/i);
     if (!zones || !vehicles || !binds) return;
 
-    // Уже обёрнуты
     if (
       zones.parentNode &&
-      zones.parentNode === vehicles.parentNode &&
-      vehicles.parentNode === binds.parentNode &&
+      zones.parentNode.classList &&
       zones.parentNode.classList.contains('admin-grid-top')
     ) {
       return;
@@ -105,46 +93,40 @@
 
     var wrap = document.createElement('div');
     wrap.className = 'admin-grid-top';
-
-    var parent = zones.parentNode;
-    parent.insertBefore(wrap, zones);
-
-    // Порядок: зоны → машины → привязки
+    zones.parentNode.insertBefore(wrap, zones);
     wrap.appendChild(zones);
     wrap.appendChild(vehicles);
     wrap.appendChild(binds);
-
-    // Сброс инлайнов, если были
-    [zones, vehicles, binds].forEach(function (p) {
-      p.style.position = '';
-      p.style.left = '';
-      p.style.top = '';
-      p.style.width = '';
-      p.style.float = '';
-      p.style.gridColumn = '';
-      p.style.margin = '';
-    });
   }
 
-  function mountMarkerInHeader() {
-    if (document.getElementById('adminMarkerStyle')) return;
+  function mountMarkerAbovePolygons() {
+    if (document.getElementById('adminMarkerStyleBlock')) return;
 
-    var old = document.getElementById('adminMarkerStyleBlock');
-    if (old && old.parentNode) old.parentNode.removeChild(old);
+    // убрать из шапки, если вдруг остался
+    var hdr = document.querySelector('.admin-marker-wrap');
+    if (hdr && hdr.parentNode) hdr.parentNode.removeChild(hdr);
 
-    var toolbar =
-      document.querySelector('.toolbar') ||
-      document.querySelector('.header') ||
-      document.querySelector('.admin-nav');
+    var poly = findPanelByTitle(/Полигон/i);
+    var box = document.createElement('div');
+    box.className = 'panel';
+    box.id = 'adminMarkerStyleBlock';
+    box.innerHTML =
+      '<div class="panel-head" style="margin-bottom:10px">' +
+      '<h2 style="margin:0;font-size:0.95rem;color:var(--muted)">Метки на карте рабочего стола</h2>' +
+      '</div>' +
+      '<div class="marker-row">' +
+      '<label for="adminMarkerStyle">Стиль</label>' +
+      '<select id="adminMarkerStyle"></select>' +
+      '<span class="muted" style="font-size:0.8rem">Сохраняется в браузере, применяется на рабочем столе</span>' +
+      '</div>';
 
-    var wrap = document.createElement('div');
-    wrap.className = 'admin-marker-wrap';
-    wrap.innerHTML =
-      '<label for="adminMarkerStyle">Метки</label>' +
-      '<select id="adminMarkerStyle" title="Стиль меток на рабочем столе"></select>';
-
-    if (toolbar) toolbar.insertBefore(wrap, toolbar.firstChild);
-    else document.body.insertBefore(wrap, document.body.firstChild);
+    if (poly && poly.parentNode) {
+      poly.parentNode.insertBefore(box, poly);
+    } else {
+      var app = document.querySelector('.app');
+      if (app) app.appendChild(box);
+      else document.body.appendChild(box);
+    }
 
     var sel = document.getElementById('adminMarkerStyle');
     var cur = getStyle();
@@ -163,7 +145,7 @@
   function boot() {
     injectLayoutCss();
     wrapTopPanels();
-    mountMarkerInHeader();
+    mountMarkerAbovePolygons();
   }
 
   if (document.readyState === 'loading') {
