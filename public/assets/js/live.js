@@ -1,7 +1,15 @@
 /**
- * Тема + пустые рейсы + автообновление + патч переноса машины в зону.
+ * Тема + пустые рейсы + автообновление + патч машины + компактные подписи.
  */
 (function () {
+  // подключить компактные иконки
+  if (!document.querySelector('script[src*="desk-compact"]')) {
+    var s = document.createElement('script');
+    s.src = 'assets/js/desk-compact.js';
+    s.defer = true;
+    document.head.appendChild(s);
+  }
+
   var THEME_KEY = 'logistics-theme';
   function preferredTheme() {
     try {
@@ -67,7 +75,6 @@
       .catch(function () {});
   };
 
-  // Патч: в vehicle_zone передаём date и после успеха обновляем страницу (зона в рейсах)
   var nativeFetch = window.fetch.bind(window);
   window.fetch = function (input, init) {
     var url = typeof input === 'string' ? input : (input && input.url) || '';
