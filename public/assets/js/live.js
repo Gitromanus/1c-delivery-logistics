@@ -1,15 +1,16 @@
 /**
- * live.js v3 — тема, рейсы, poll. Компакт: desk-compact-v2.js
+ * live.js v4 — тема, рейсы, poll, compact, map markers
  */
 (function () {
-  (function loadCompact() {
-    var id = 'desk-compact-v2';
+  function loadScript(id, src) {
     if (document.getElementById(id)) return;
     var s = document.createElement('script');
     s.id = id;
-    s.src = 'assets/js/desk-compact-v2.js?v=3';
+    s.src = src;
     document.head.appendChild(s);
-  })();
+  }
+  loadScript('desk-compact-v2', 'assets/js/desk-compact-v2.js?v=4');
+  loadScript('map-markers', 'assets/js/map-markers.js?v=1');
 
   var THEME_KEY = 'logistics-theme';
   function preferredTheme() {
