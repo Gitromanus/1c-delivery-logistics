@@ -29,6 +29,13 @@ CREATE TABLE IF NOT EXISTS vehicle_zones (
   CONSTRAINT fk_vz_zone FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS zone_polygons (
+  zone_id INT UNSIGNED NOT NULL PRIMARY KEY,
+  polygon MEDIUMTEXT NOT NULL COMMENT 'JSON [[lat,lon],...]',
+  color VARCHAR(32) DEFAULT NULL,
+  CONSTRAINT fk_zp_zone FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS orders (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   external_id VARCHAR(100) NOT NULL,
@@ -71,23 +78,5 @@ CREATE TABLE IF NOT EXISTS trip_items (
   CONSTRAINT fk_ti_trip FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE,
   CONSTRAINT fk_ti_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Демо-данные (можно удалить)
-INSERT INTO zones (name, code, keywords, sort_order) VALUES
-('Молодёжный', 'molodezhny', 'Молодёжн;Молодежн', 10),
-('Донской', 'donskoy', 'Донск', 20),
-('Новочеркасск', 'novocherkassk', 'Новочеркасск', 30),
-('Шахты', 'shahty', 'Шахты', 40);
-
-INSERT INTO vehicles (name, plate, capacity_kg) VALUES
-('Газель А123АА', 'А123АА', 900),
-('Газель В456ВВ', 'В456ВВ', 900),
-('Фургон С789СС', 'С789СС', 1500);
-
-INSERT INTO vehicle_zones (vehicle_id, zone_id, is_primary) VALUES
-(1, 1, 1),
-(2, 2, 1),
-(2, 1, 0),
-(3, 3, 1);
 
 SET FOREIGN_KEY_CHECKS = 1;
