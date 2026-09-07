@@ -2,7 +2,6 @@
 /**
  * Админка: полный UI в admin_app.full.php (кэш),
  * при отсутствии — скачать с GitHub и выполнить через require.
- * Важно: НЕ echo исходник — иначе PHP выведется текстом на страницу.
  */
 $cache = __DIR__ . '/admin_app.full.php';
 
@@ -36,7 +35,6 @@ if (!is_file($cache) || filesize($cache) < 5000) {
     file_put_contents($cache, $data);
 }
 
-// Подмешать скрипты в кэш-файл (один раз), затем require — PHP выполнится
 $html = file_get_contents($cache);
 $changed = false;
 
@@ -49,16 +47,27 @@ if (strpos($html, 'theme.js') === false) {
     }
 }
 
+// Всегда актуальная версия admin-settings
 if (strpos($html, 'admin-settings.js') === false) {
     if (stripos($html, '</body>') !== false) {
         $html = str_ireplace(
             '</body>',
-            "  <script src=\"../assets/js/admin-settings.js?v=1\"></script>\n</body>",
+            "  <script src=\"../assets/js/admin-settings.js?v=2\"></script>\n</body>",
             $html
         );
         $changed = true;
     } else {
-        $html .= "\n<script src=\"../assets/js/admin-settings.js?v=1\"></script>\n";
+        $html .= "\n<script src=\"../assets/js/admin-settings.js?v=2\"></script>\n";
+        $changed = true;
+    }
+} else {
+    $newHtml = preg_replace(
+        '#admin-settings\.js(\?v=\d+)?#',
+        'admin-settings.js?v=2',
+        $html
+    );
+    if ($newHtml !== $html) {
+        $html = $newHtml;
         $changed = true;
     }
 }
