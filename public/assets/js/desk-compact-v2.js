@@ -1,11 +1,14 @@
 /**
- * Компактные подписи + кнопка «Навигатор» у рейса.
- * Маршрут — бесплатный deeplink, без Router API.
+ * Компактные подписи + Навигатор (иконка) + порядок кнопок в шапке рейса.
  */
 (function () {
   var IC_SCALE = '<span class="ic ic-scale" aria-hidden="true"></span>';
   var IC_TRUCK = '<span class="ic ic-truck" aria-hidden="true"></span>';
   var IC_BOX = '<span class="ic ic-box" aria-hidden="true"></span>';
+  var NAVI_ICON =
+    '<svg class="navi-ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">' +
+    '<path fill="currentColor" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/>' +
+    '</svg>';
   var busy = false;
   var timer = null;
 
@@ -56,19 +59,6 @@
     el.setAttribute('data-compact-n', String(n));
   }
 
-  function run() {
-    if (busy) return;
-    busy = true;
-    try {
-      document.querySelectorAll('.zone-card .meta').forEach(compactMeta);
-      document.querySelectorAll('.zone-cap').forEach(compactCap);
-      document.querySelectorAll('.trip-weight').forEach(compactTripWeight);
-      addNaviButtons();
-    } finally {
-      busy = false;
-    }
-  }
-
   function pointsForTrip(tripEl) {
     var pts = [];
     if (typeof mapPoints === 'undefined' || !mapPoints) return pts;
@@ -108,34 +98,104 @@
     return 'https://yandex.ru/maps/?rtext=' + parts.join('~') + '&rtt=auto';
   }
 
+  /** Порядок в шапке: название | … | Навигатор | Свернуть */
+  function layoutTripTitle(trip) {
+    var title = trip.querySelector('.title');
+    if (!title) return;
+
+    var nameEl = title.querySelector('.trip-name');
+    if (!nameEl) {
+      // первая «текстовая» нода / span без класса кнопок
+      var kids = Array.prototype.slice.call(title.childNodes);
+      for (var i = 0; i < kids.length; i++) {
+        var n = kids[i];
+        if (n.nodeType === 1 && n.tagName === 'SPAN' && !n.classList.contains('trip-actions')) {
+          n.classList.add('trip-name');
+          nameEl = n;
+          break;
+        }
+        if (n.nodeType === 3 && n.textContent.trim()) {
+          var sp = document.createElement('span');
+          sp.className = 'trip-name';
+          sp.textContent = n.textContent;
+          title.replaceChild(sp, n);
+          nameEl = sp;
+          break;
+        }
+      }
+    }
+
+    var actions = title.querySelector('.trip-actions');
+    if (!actions) {
+      actions = document.createElement('div');
+      actions.className = 'trip-actions';
+      title.appendChild(actions);
+    }
+
+    var toggle = title.querySelector('.trip-toggle') || actions.querySelector('.trip-toggle');
+    var navi = title.querySelector('.btn-navi') || actions.querySelector('.btn-navi');
+
+    if (navi && navi.parentNode !== actions) actions.appendChild(navi);
+    if (toggle && toggle.parentNode !== actions) actions.appendChild(toggle);
+
+    // жёсткий порядок: navi, потом toggle
+    if (navi) actions.appendChild(navi);
+    if (toggle) actions.appendChild(toggle);
+  }
+
   function addNaviButtons() {
     document.querySelectorAll('.trip').forEach(function (trip) {
-      if (trip.querySelector('.btn-navi')) return;
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'btn btn-primary btn-sm btn-navi';
-      btn.textContent = 'Навигатор';
-      btn.title = 'Открыть точки рейса в Яндекс Навигаторе';
-      btn.addEventListener('click', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        var pts = pointsForTrip(trip);
-        if (!pts.length) {
-          alert('У заявок в рейсе нет координат.\nСначала нажмите «Геокод с карты» на рабочем столе.');
-          return;
-        }
-        var navi = naviUrl(pts);
-        var maps = mapsUrl(pts);
-        // На телефоне откроет Навигатор; если нет — через ~0.7с Карты
-        window.location.href = navi;
-        setTimeout(function () {
-          if (maps) window.open(maps, '_blank');
-        }, 700);
-      });
       var title = trip.querySelector('.title');
-      if (title) title.appendChild(btn);
-      else trip.appendChild(btn);
+      if (!title) return;
+
+      if (!trip.querySelector('.btn-navi')) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-primary btn-navi btn-icon-navi';
+        btn.innerHTML = NAVI_ICON;
+        btn.title = 'Открыть в Яндекс Навигаторе';
+        btn.setAttribute('aria-label', 'Навигатор');
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          var pts = pointsForTrip(trip);
+          if (!pts.length) {
+            alert('У заявок в рейсе нет координат.\nСначала «Геокод с карты».');
+            return;
+          }
+          var navi = naviUrl(pts);
+          var maps = mapsUrl(pts);
+          window.location.href = navi;
+          setTimeout(function () {
+            if (maps) window.open(maps, '_blank');
+          }, 700);
+        });
+        title.appendChild(btn);
+      } else {
+        var existing = trip.querySelector('.btn-navi');
+        if (existing && !existing.querySelector('.navi-ico')) {
+          existing.classList.add('btn-icon-navi');
+          existing.innerHTML = NAVI_ICON;
+          existing.title = 'Открыть в Яндекс Навигаторе';
+          existing.setAttribute('aria-label', 'Навигатор');
+        }
+      }
+
+      layoutTripTitle(trip);
     });
+  }
+
+  function run() {
+    if (busy) return;
+    busy = true;
+    try {
+      document.querySelectorAll('.zone-card .meta').forEach(compactMeta);
+      document.querySelectorAll('.zone-cap').forEach(compactCap);
+      document.querySelectorAll('.trip-weight').forEach(compactTripWeight);
+      addNaviButtons();
+    } finally {
+      busy = false;
+    }
   }
 
   function schedule() {
@@ -147,7 +207,7 @@
     run();
     document.addEventListener('mouseup', schedule);
     document.addEventListener('touchend', schedule);
-    setInterval(run, 2000);
+    setInterval(run, 3000);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
