@@ -12,14 +12,15 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
     exit;
 }
 
-if (!class_exists('EnsureTrips')) {
-    require_once (is_dir(dirname(__DIR__) . '/src') ? dirname(__DIR__) : __DIR__ . '/..') . '/src/EnsureTrips.php';
+$src = dirname(__DIR__) . '/src/EnsureTrips.php';
+if (!class_exists('EnsureTrips') && is_file($src)) {
+    require_once $src;
 }
 
-// bootstrap already loads some classes; force EnsureTrips
-$src = dirname(__DIR__) . '/src/EnsureTrips.php';
-if (is_file($src)) {
-    require_once $src;
+if (!class_exists('EnsureTrips')) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'EnsureTrips class missing']);
+    exit;
 }
 
 $result = EnsureTrips::forDate(Database::pdo(), $date);
