@@ -1,4 +1,7 @@
 <?php
+/**
+ * Админка. Кэш admin_app.full.php + admin-settings.js?v=5
+ */
 $cache = __DIR__ . '/admin_app.full.php';
 
 if (!is_file($cache) || filesize($cache) < 5000) {
@@ -34,30 +37,35 @@ $changed = false;
 if (strpos($html, 'theme.js') === false) {
     $needle = '<link rel="stylesheet" href="../assets/css/style.css">';
     if (strpos($html, $needle) !== false) {
-        $html = str_replace(
-            $needle,
-            $needle . "\n  <script src=\"../assets/js/theme.js\"></script>",
-            $html
-        );
+        $html = str_replace($needle, $needle . "\n  <script src=\"../assets/js/theme.js\"></script>", $html);
         $changed = true;
     }
 }
 
-if (strpos($html, 'admin-settings.js') === false) {
-    if (stripos($html, '</body>') !== false) {
-        $html = str_ireplace('</body>', "  <script src=\"../assets/js/admin-settings.js?v=4\"></script>\n</body>", $html);
-    } else {
-        $html .= "\n<script src=\"../assets/js/admin-settings.js?v=4\"></script>\n";
-    }
+// Всегда подключаем свежий admin-settings (и убираем старые дубликаты)
+$html2 = preg_replace(
+    '#\s*<script[^>]*admin-settings\.js[^>]*></script>#i',
+    '',
+    $html
+);
+if ($html2 !== $html) {
+    $html = $html2;
+    $changed = true;
+}
+if (stripos($html, '</body>') !== false) {
+    $html = str_ireplace(
+        '</body>',
+        "  <script src=\"../assets/js/admin-settings.js?v=5\"></script>\n</body>",
+        $html
+    );
     $changed = true;
 } else {
-    $newHtml = preg_replace('#admin-settings\.js(\?v=\d+)?#', 'admin-settings.js?v=4', $html);
-    if ($newHtml !== $html) {
-        $html = $newHtml;
-        $changed = true;
-    }
+    $html .= "\n<script src=\"../assets/js/admin-settings.js?v=5\"></script>\n";
+    $changed = true;
 }
 
-if ($changed) file_put_contents($cache, $html);
+if ($changed) {
+    file_put_contents($cache, $html);
+}
 
 require $cache;
