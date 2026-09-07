@@ -1,8 +1,7 @@
 /**
- * Тема + пустые рейсы + автообновление.
+ * Тема + пустые рейсы + автообновление + патч переноса машины в зону.
  */
 (function () {
-  // —— тема (дублирует theme.js, если он уже загружен — кнопка одна) ——
   var THEME_KEY = 'logistics-theme';
   function preferredTheme() {
     try {
@@ -24,8 +23,6 @@
   applyTheme(preferredTheme());
   function ensureThemeButton() {
     if (document.getElementById('themeToggle')) return;
-    var toolbar = document.querySelector('.toolbar');
-    if (!toolbar) return;
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.id = 'themeToggle';
@@ -37,13 +34,15 @@
       var cur = document.documentElement.getAttribute('data-theme') || 'dark';
       applyTheme(cur === 'light' ? 'dark' : 'light');
     });
-    toolbar.appendChild(btn);
+    var toolbar = document.querySelector('.toolbar');
+    if (toolbar) toolbar.appendChild(btn);
+    else {
+      btn.style.cssText = 'position:fixed;top:12px;right:12px;z-index:50';
+      document.body.appendChild(btn);
+    }
   }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', ensureThemeButton);
-  } else {
-    ensureThemeButton();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensureThemeButton);
+  else ensureThemeButton();
 
   var dateInput = document.querySelector('input[name="date"]');
   var date = dateInput ? dateInput.value : new Date().toISOString().slice(0, 10);
@@ -68,15 +67,38 @@
       .catch(function () {});
   };
 
-  /** Пустые рейсы для всех машин — ручная сборка без «Пересобрать» */
+  // Патч: в vehicle_zone передаём date и после успеха обновляем страницу (зона в рейсах)
+  var nativeFetch = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    if (url.indexOf('vehicle_zone.php') !== -1 && init && init.body && typeof init.body === 'string') {
+      try {
+        var body = JSON.parse(init.body);
+        if (body && body.action === 'move') {
+          body.date = date;
+          init = Object.assign({}, init, { body: JSON.stringify(body) });
+          return nativeFetch(input, init).then(function (res) {
+            return res.clone().json().then(function (data) {
+              if (data && data.ok) {
+                quietUntil = Date.now() + 15000;
+                setTimeout(function () { location.reload(); }, 50);
+              }
+              return res;
+            }).catch(function () { return res; });
+          });
+        }
+      } catch (e) {}
+    }
+    return nativeFetch(input, init);
+  };
+
   function ensureEmptyTrips() {
     if (ensureDone) return;
     ensureDone = true;
-    fetch('api/ensure_trips.php?date=' + encodeURIComponent(date), { method: 'POST', cache: 'no-store' })
+    nativeFetch('api/ensure_trips.php?date=' + encodeURIComponent(date), { method: 'POST', cache: 'no-store' })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data && data.ok && data.created > 0) {
-          // появились новые пустые рейсы — обновить список
           quietUntil = Date.now() + 5000;
           location.reload();
         }
@@ -94,7 +116,7 @@
       wasDragging = true;
       return;
     }
-    fetch('api/desk_poll.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
+    nativeFetch('api/desk_poll.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (!data || !data.ok || !data.version) return;
