@@ -1,6 +1,6 @@
 /**
- * Переключатель светлая / тёмная тема.
- * Сохраняется в localStorage (ключ logistics-theme).
+ * Светлая / тёмная тема. localStorage: logistics-theme
+ * Работает на рабочем столе и в админке.
  */
 (function () {
   var KEY = 'logistics-theme';
@@ -27,13 +27,10 @@
     }
   }
 
-  // Сразу до отрисовки, чтобы не мигало
   apply(preferred());
 
   function ensureButton() {
     if (document.getElementById('themeToggle')) return;
-    var toolbar = document.querySelector('.toolbar');
-    if (!toolbar) return;
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.id = 'themeToggle';
@@ -45,8 +42,20 @@
       var cur = document.documentElement.getAttribute('data-theme') || 'dark';
       apply(cur === 'light' ? 'dark' : 'light');
     });
-    // В конец тулбара
-    toolbar.appendChild(btn);
+    var toolbar = document.querySelector('.toolbar');
+    if (toolbar) {
+      toolbar.appendChild(btn);
+      return;
+    }
+    // Страница входа в админку — без toolbar
+    var app = document.querySelector('.app');
+    if (app) {
+      btn.style.position = 'fixed';
+      btn.style.top = '12px';
+      btn.style.right = '12px';
+      btn.style.zIndex = '50';
+      document.body.appendChild(btn);
+    }
   }
 
   if (document.readyState === 'loading') {

@@ -1,8 +1,8 @@
 /**
- * Тема + автообновление рабочего стола.
+ * Тема + пустые рейсы + автообновление.
  */
 (function () {
-  // —— тема ——
+  // —— тема (дублирует theme.js, если он уже загружен — кнопка одна) ——
   var THEME_KEY = 'logistics-theme';
   function preferredTheme() {
     try {
@@ -19,7 +19,6 @@
     if (btn) {
       btn.textContent = theme === 'light' ? '🌙' : '☀️';
       btn.title = theme === 'light' ? 'Тёмная тема' : 'Светлая тема';
-      btn.setAttribute('aria-label', btn.title);
     }
   }
   applyTheme(preferredTheme());
@@ -46,7 +45,6 @@
     ensureThemeButton();
   }
 
-  // —— live poll ——
   var dateInput = document.querySelector('input[name="date"]');
   var date = dateInput ? dateInput.value : new Date().toISOString().slice(0, 10);
   var lastVersion = null;
@@ -54,6 +52,7 @@
   var timer = null;
   var quietUntil = 0;
   var wasDragging = false;
+  var ensureDone = false;
 
   function isDragging() {
     return document.body.classList.contains('dd-dragging');
@@ -68,6 +67,22 @@
       })
       .catch(function () {});
   };
+
+  /** Пустые рейсы для всех машин — ручная сборка без «Пересобрать» */
+  function ensureEmptyTrips() {
+    if (ensureDone) return;
+    ensureDone = true;
+    fetch('api/ensure_trips.php?date=' + encodeURIComponent(date), { method: 'POST', cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && data.ok && data.created > 0) {
+          // появились новые пустые рейсы — обновить список
+          quietUntil = Date.now() + 5000;
+          location.reload();
+        }
+      })
+      .catch(function () {});
+  }
 
   function poll() {
     if (document.hidden) return;
@@ -100,6 +115,7 @@
   }
 
   function start() {
+    ensureEmptyTrips();
     if (timer) clearInterval(timer);
     poll();
     timer = setInterval(poll, intervalMs);
