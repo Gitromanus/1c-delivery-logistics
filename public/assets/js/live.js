@@ -1,14 +1,16 @@
 /**
- * Тема + пустые рейсы + автообновление + патч машины + компактные подписи.
+ * live.js v3 — тема, рейсы, poll. Компакт: desk-compact-v2.js
  */
 (function () {
-  // подключить компактные иконки
-  if (!document.querySelector('script[src*="desk-compact"]')) {
+  // Сразу грузим новый файл (старый desk-compact.js мог зависнуть в кэше)
+  (function loadCompact() {
+    var id = 'desk-compact-v2';
+    if (document.getElementById(id)) return;
     var s = document.createElement('script');
-    s.src = 'assets/js/desk-compact.js';
-    s.defer = true;
+    s.id = id;
+    s.src = 'assets/js/desk-compact-v2.js?v=3';
     document.head.appendChild(s);
-  }
+  })();
 
   var THEME_KEY = 'logistics-theme';
   function preferredTheme() {
