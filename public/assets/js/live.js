@@ -2,7 +2,6 @@
  * live.js v3 — тема, рейсы, poll. Компакт: desk-compact-v2.js
  */
 (function () {
-  // Сразу грузим новый файл (старый desk-compact.js мог зависнуть в кэше)
   (function loadCompact() {
     var id = 'desk-compact-v2';
     if (document.getElementById(id)) return;
@@ -69,7 +68,7 @@
 
   window.deskAckLocalChange = function () {
     quietUntil = Date.now() + 30000;
-    fetch('api/desk_poll.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
+    nativeFetch('api/desk_poll.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data && data.ok && data.version) lastVersion = data.version;
