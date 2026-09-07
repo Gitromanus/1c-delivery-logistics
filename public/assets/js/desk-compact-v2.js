@@ -1,4 +1,7 @@
-/** Компактные подписи v2 — без зависания */
+/**
+ * Компактные подписи + кнопка «Навигатор» у рейса.
+ * Маршрут — бесплатный deeplink, без Router API.
+ */
 (function () {
   var IC_SCALE = '<span class="ic ic-scale" aria-hidden="true"></span>';
   var IC_TRUCK = '<span class="ic ic-truck" aria-hidden="true"></span>';
@@ -60,9 +63,79 @@
       document.querySelectorAll('.zone-card .meta').forEach(compactMeta);
       document.querySelectorAll('.zone-cap').forEach(compactCap);
       document.querySelectorAll('.trip-weight').forEach(compactTripWeight);
+      addNaviButtons();
     } finally {
       busy = false;
     }
+  }
+
+  function pointsForTrip(tripEl) {
+    var pts = [];
+    if (typeof mapPoints === 'undefined' || !mapPoints) return pts;
+    tripEl.querySelectorAll('.orders-list > .drag-order').forEach(function (ord) {
+      var oid = ord.getAttribute('data-order-id');
+      for (var i = 0; i < mapPoints.length; i++) {
+        if (String(mapPoints[i].id) === String(oid)) {
+          var p = mapPoints[i];
+          if (p.lat != null && p.lon != null && p.lat !== '' && p.lon !== '') {
+            var lat = Number(p.lat);
+            var lon = Number(p.lon);
+            if (!isNaN(lat) && !isNaN(lon)) pts.push({ lat: lat, lon: lon });
+          }
+          break;
+        }
+      }
+    });
+    return pts;
+  }
+
+  function naviUrl(pts) {
+    if (!pts.length) return null;
+    var last = pts[pts.length - 1];
+    var q = 'lat_to=' + last.lat + '&lon_to=' + last.lon;
+    for (var i = 0; i < pts.length - 1; i++) {
+      q += '&lat_via_' + i + '=' + pts[i].lat + '&lon_via_' + i + '=' + pts[i].lon;
+    }
+    return 'yandexnavi://build_route_on_map?' + q;
+  }
+
+  function mapsUrl(pts) {
+    if (!pts.length) return null;
+    var parts = [''];
+    for (var i = 0; i < pts.length; i++) {
+      parts.push(pts[i].lat + ',' + pts[i].lon);
+    }
+    return 'https://yandex.ru/maps/?rtext=' + parts.join('~') + '&rtt=auto';
+  }
+
+  function addNaviButtons() {
+    document.querySelectorAll('.trip').forEach(function (trip) {
+      if (trip.querySelector('.btn-navi')) return;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-primary btn-sm btn-navi';
+      btn.textContent = 'Навигатор';
+      btn.title = 'Открыть точки рейса в Яндекс Навигаторе';
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var pts = pointsForTrip(trip);
+        if (!pts.length) {
+          alert('У заявок в рейсе нет координат.\nСначала нажмите «Геокод с карты» на рабочем столе.');
+          return;
+        }
+        var navi = naviUrl(pts);
+        var maps = mapsUrl(pts);
+        // На телефоне откроет Навигатор; если нет — через ~0.7с Карты
+        window.location.href = navi;
+        setTimeout(function () {
+          if (maps) window.open(maps, '_blank');
+        }, 700);
+      });
+      var title = trip.querySelector('.title');
+      if (title) title.appendChild(btn);
+      else trip.appendChild(btn);
+    });
   }
 
   function schedule() {
@@ -72,10 +145,9 @@
 
   function start() {
     run();
-    // Без MutationObserver — только после DnD через события
     document.addEventListener('mouseup', schedule);
     document.addEventListener('touchend', schedule);
-    setInterval(run, 2000); // лёгкий подхват после API-обновлений
+    setInterval(run, 2000);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
