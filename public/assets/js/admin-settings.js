@@ -1,5 +1,5 @@
 /**
- * Админка v6 — метки на всю ширину ПОД рядом зоны/машины/привязки
+ * Админка v7 — стиль меток внутри блока «Полигоны зон»
  */
 (function () {
   var STYLE_KEY = 'logistics-marker-style';
@@ -25,45 +25,32 @@
   }
 
   function injectLayoutCss() {
-    if (document.getElementById('admin-layout-css')) {
-      document.getElementById('admin-layout-css').remove();
-    }
+    var old = document.getElementById('admin-layout-css');
+    if (old) old.remove();
     var css = document.createElement('style');
     css.id = 'admin-layout-css';
     css.textContent = [
-      /* Ряд из 3 карточек — на всю ширину родителя-сетки */',
       '.admin-grid-top{',
       '  display:grid!important;',
       '  grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)!important;',
-      '  gap:16px!important;',
-      '  width:100%!important;',
-      '  max-width:100%!important;',
-      '  margin:0 0 16px!important;',
+      '  gap:16px!important;width:100%!important;margin:0 0 16px!important;',
       '  grid-column:1/-1!important;',
-      '  flex:0 0 100%!important;',
       '}',
-      '.admin-grid-top > .panel, .admin-grid-top > section.panel{',
+      '.admin-grid-top > .panel,.admin-grid-top > section.panel{',
       '  position:relative!important;float:none!important;',
       '  width:auto!important;min-width:0!important;margin:0!important;',
-      '  box-sizing:border-box!important;overflow:auto!important;',
+      '  overflow:auto!important;box-sizing:border-box!important;',
       '}',
       '@media(max-width:1100px){.admin-grid-top{grid-template-columns:1fr!important;}}',
-      /* Метки — отдельная полоса на всю ширину, не 4-я колонка */',
-      '#adminMarkerStyleBlock{',
-      '  display:block!important;',
-      '  width:100%!important;',
-      '  max-width:100%!important;',
-      '  box-sizing:border-box!important;',
-      '  margin:0 0 16px!important;',
-      '  grid-column:1/-1!important;',
-      '  flex:0 0 100%!important;',
-      '  float:none!important;',
+      '#adminMarkerStyleBlock{display:none!important;}',
+      '.admin-marker-in-poly{',
+      '  display:flex;align-items:center;gap:10px;flex-wrap:wrap;',
+      '  margin:0 0 12px;padding:10px 12px;',
+      '  background:var(--panel-2,#f0f2f5);border-radius:8px;',
+      '  border:1px solid var(--border,#dde1e8);',
       '}',
-      '#adminMarkerStyleBlock .marker-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}',
-      '#adminMarkerStyleBlock label{font-size:0.85rem;color:var(--muted);}',
-      '#adminMarkerStyleBlock select{min-width:200px;padding:8px 12px;}',
-      /* Полигоны тоже на всю ширину */',
-      'section.panel h2{font-size:0.95rem;}'
+      '.admin-marker-in-poly label{font-size:0.85rem;color:var(--muted);white-space:nowrap;}',
+      '.admin-marker-in-poly select{min-width:200px;padding:8px 12px;}'
     ].join('\n');
     document.head.appendChild(css);
   }
@@ -72,10 +59,6 @@
     var found = null;
     document.querySelectorAll('section.panel, .panel').forEach(function (p) {
       if (found) return;
-      if (p.id === 'adminMarkerStyleBlock') return;
-      if (p.closest && p.closest('.admin-grid-top') && !re.test('')) {
-        /* still allow finding inside grid by title */
-      }
       var head = p.querySelector('.panel-head h2, h2, h3');
       var t = head ? (head.textContent || '').trim() : '';
       if (re.test(t)) found = p;
@@ -87,74 +70,67 @@
     var zones = findPanelByTitle(/^Зон/i);
     var vehicles = findPanelByTitle(/^Машин/i);
     var binds = findPanelByTitle(/Привяз/i);
-    if (!zones || !vehicles || !binds) return null;
-
+    if (!zones || !vehicles || !binds) return;
     if (zones.parentNode && zones.parentNode.classList && zones.parentNode.classList.contains('admin-grid-top')) {
-      return zones.parentNode;
+      return;
     }
-
     var wrap = document.createElement('div');
     wrap.className = 'admin-grid-top';
     zones.parentNode.insertBefore(wrap, zones);
     wrap.appendChild(zones);
     wrap.appendChild(vehicles);
     wrap.appendChild(binds);
-    return wrap;
   }
 
-  function mountMarkerBlock(grid) {
+  function mountMarkerInPolygons() {
+    if (document.getElementById('adminMarkerStyle')) return;
+
     var poly = findPanelByTitle(/Полигон/i);
-    var box = document.getElementById('adminMarkerStyleBlock');
-
-    if (!box) {
-      box = document.createElement('section');
-      box.className = 'panel';
-      box.id = 'adminMarkerStyleBlock';
-      box.innerHTML =
-        '<h2 style="margin:0 0 10px;font-size:0.95rem;color:var(--muted);font-weight:600">Метки на карте рабочего стола</h2>' +
-        '<div class="marker-row">' +
-        '<label for="adminMarkerStyle">Стиль</label> ' +
-        '<select id="adminMarkerStyle"></select> ' +
-        '<span class="muted" style="font-size:0.8rem">Сохраняется в браузере, применяется на рабочем столе</span>' +
-        '</div>';
-
-      var sel = box.querySelector('#adminMarkerStyle');
-      var cur = getStyle();
-      Object.keys(STYLES).forEach(function (k) {
-        var opt = document.createElement('option');
-        opt.value = k;
-        opt.textContent = STYLES[k];
-        if (k === cur) opt.selected = true;
-        sel.appendChild(opt);
-      });
-      sel.addEventListener('change', function () {
-        setStyle(sel.value);
-      });
+    if (!poly) {
+      // запасной вариант — в .app
+      poly = document.querySelector('.app');
+      if (!poly) return;
     }
 
-    // Вставить: после grid, перед полигонами
-    if (grid && grid.parentNode) {
-      if (poly && poly.parentNode === grid.parentNode) {
-        poly.parentNode.insertBefore(box, poly);
-      } else if (grid.nextSibling) {
-        grid.parentNode.insertBefore(box, grid.nextSibling);
-      } else {
-        grid.parentNode.appendChild(box);
-      }
-    } else if (poly && poly.parentNode) {
-      poly.parentNode.insertBefore(box, poly);
+    var row = document.createElement('div');
+    row.className = 'admin-marker-in-poly';
+    row.innerHTML =
+      '<label for="adminMarkerStyle"><strong>Метки на карте</strong> — стиль</label>' +
+      '<select id="adminMarkerStyle"></select>' +
+      '<span class="muted" style="font-size:0.8rem">для рабочего стола</span>';
+
+    // после заголовка h2
+    var h2 = poly.querySelector('h2');
+    if (h2 && h2.nextSibling) {
+      poly.insertBefore(row, h2.nextSibling);
+    } else if (h2) {
+      h2.parentNode.insertBefore(row, h2.nextSibling);
+    } else {
+      poly.insertBefore(row, poly.firstChild);
     }
+
+    var sel = document.getElementById('adminMarkerStyle');
+    var cur = getStyle();
+    Object.keys(STYLES).forEach(function (k) {
+      var opt = document.createElement('option');
+      opt.value = k;
+      opt.textContent = STYLES[k];
+      if (k === cur) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', function () {
+      setStyle(sel.value);
+    });
   }
 
   function boot() {
     injectLayoutCss();
-    var grid = wrapTopPanels();
-    mountMarkerBlock(grid);
+    wrapTopPanels();
+    mountMarkerInPolygons();
     setTimeout(function () {
-      injectLayoutCss();
-      var g = document.querySelector('.admin-grid-top') || wrapTopPanels();
-      mountMarkerBlock(g);
-    }, 300);
+      wrapTopPanels();
+      if (!document.getElementById('adminMarkerStyle')) mountMarkerInPolygons();
+    }, 400);
   }
 
   if (document.readyState === 'loading') {

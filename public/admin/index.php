@@ -37,15 +37,15 @@ if (strpos($html, 'theme.js') === false) {
 }
 
 $html2 = preg_replace('#\s*<script[^>]*admin-settings\.js[^>]*></script>#i', '', $html);
-if ($html2 !== $html) {
+if ($html2 !== null && $html2 !== $html) {
     $html = $html2;
     $changed = true;
 }
 if (stripos($html, '</body>') !== false) {
-    $html = str_ireplace('</body>', "  <script src=\"../assets/js/admin-settings.js?v=6\"></script>\n</body>", $html);
+    $html = str_ireplace('</body>', "  <script src=\"../assets/js/admin-settings.js?v=7\"></script>\n</body>", $html);
     $changed = true;
 } else {
-    $html .= "\n<script src=\"../assets/js/admin-settings.js?v=6\"></script>\n";
+    $html .= "\n<script src=\"../assets/js/admin-settings.js?v=7\"></script>\n";
     $changed = true;
 }
 
