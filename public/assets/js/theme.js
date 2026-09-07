@@ -1,6 +1,6 @@
 /**
  * Светлая / тёмная тема. localStorage: logistics-theme
- * Работает на рабочем столе и в админке.
+ * Рабочий стол + админка.
  */
 (function () {
   var KEY = 'logistics-theme';
@@ -47,15 +47,8 @@
       toolbar.appendChild(btn);
       return;
     }
-    // Страница входа в админку — без toolbar
-    var app = document.querySelector('.app');
-    if (app) {
-      btn.style.position = 'fixed';
-      btn.style.top = '12px';
-      btn.style.right = '12px';
-      btn.style.zIndex = '50';
-      document.body.appendChild(btn);
-    }
+    btn.style.cssText = 'position:fixed;top:12px;right:12px;z-index:50';
+    document.body.appendChild(btn);
   }
 
   if (document.readyState === 'loading') {

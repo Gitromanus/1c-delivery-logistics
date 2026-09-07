@@ -2,7 +2,8 @@
 /**
  * Операции с машиной и зоной (для drag & drop машин на рабочем столе).
  * POST (JSON):
- *   { action: 'move', vehicle_id, zone_id } — перенести машину в зону (единственная привязка)
+ *   { action: 'move', vehicle_id, zone_id, date? } — перенести машину в зону
+ *   и обновить zone_id у рейсов этой машины на дату.
  */
 require dirname(__DIR__) . '/bootstrap.php';
 
@@ -25,6 +26,10 @@ if (!is_array($data)) {
 $action = (string) ($data['action'] ?? '');
 $vehicleId = (int) ($data['vehicle_id'] ?? 0);
 $zoneId = (int) ($data['zone_id'] ?? 0);
+$date = (string) ($data['date'] ?? date('Y-m-d'));
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+    $date = date('Y-m-d');
+}
 
 if ($vehicleId <= 0 || $zoneId <= 0) {
     http_response_code(400);
@@ -41,21 +46,31 @@ if (!$chk->fetch()) {
     echo json_encode(['ok' => false, 'error' => 'vehicle not found']);
     exit;
 }
-$chk = $pdo->prepare('SELECT id FROM zones WHERE id = ?');
-$chk->execute([$zoneId]);
-if (!$chk->fetch()) {
+$zchk = $pdo->prepare('SELECT id, name FROM zones WHERE id = ?');
+$zchk->execute([$zoneId]);
+$zone = $zchk->fetch();
+if (!$zone) {
     http_response_code(404);
     echo json_encode(['ok' => false, 'error' => 'zone not found']);
     exit;
 }
 
 if ($action === 'move') {
-    // Перераспределяем: машина становится привязанной только к этой зоне (основная)
     $pdo->beginTransaction();
     try {
         $pdo->prepare('DELETE FROM vehicle_zones WHERE vehicle_id = ?')->execute([$vehicleId]);
-        $pdo->prepare('INSERT IGNORE INTO vehicle_zones (vehicle_id, zone_id, is_primary) VALUES (?, ?, 1)')
-            ->execute([$vehicleId, $zoneId]);
+        $pdo->prepare(
+            'INSERT IGNORE INTO vehicle_zones (vehicle_id, zone_id, is_primary) VALUES (?, ?, 1)'
+        )->execute([$vehicleId, $zoneId]);
+
+        // Рейсы этой машины на дату — в новую зону
+        $updTrips = $pdo->prepare(
+            "UPDATE trips SET zone_id = ?
+             WHERE vehicle_id = ? AND trip_date = ? AND status <> 'cancelled'"
+        );
+        $updTrips->execute([$zoneId, $vehicleId, $date]);
+        $tripsUpdated = $updTrips->rowCount();
+
         $pdo->commit();
     } catch (Throwable $e) {
         $pdo->rollBack();
@@ -63,7 +78,16 @@ if ($action === 'move') {
         echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
         exit;
     }
-    echo json_encode(['ok' => true, 'action' => 'move', 'vehicle_id' => $vehicleId, 'zone_id' => $zoneId]);
+
+    echo json_encode([
+        'ok' => true,
+        'action' => 'move',
+        'vehicle_id' => $vehicleId,
+        'zone_id' => $zoneId,
+        'zone_name' => $zone['name'],
+        'date' => $date,
+        'trips_updated' => $tripsUpdated,
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
