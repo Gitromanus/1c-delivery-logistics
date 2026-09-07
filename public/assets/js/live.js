@@ -1,4 +1,4 @@
-/** live.js v5 */
+/** live.js v6 */
 (function () {
   function loadScript(id, src) {
     if (document.getElementById(id)) return;
@@ -7,8 +7,8 @@
     s.src = src;
     document.head.appendChild(s);
   }
-  loadScript('desk-compact-v2', 'assets/js/desk-compact-v2.js?v=5');
-  loadScript('map-markers', 'assets/js/map-markers.js?v=2');
+  loadScript('desk-compact-v2', 'assets/js/desk-compact-v2.js?v=6');
+  loadScript('map-markers', 'assets/js/map-markers.js?v=3');
 
   var THEME_KEY = 'logistics-theme';
   function preferredTheme() {
@@ -21,7 +21,9 @@
   }
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
-    try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch (e) {}
     var btn = document.getElementById('themeToggle');
     if (btn) {
       btn.textContent = theme === 'light' ? '🌙' : '☀️';
@@ -69,7 +71,9 @@
   window.deskAckLocalChange = function () {
     quietUntil = Date.now() + 30000;
     nativeFetch('api/desk_poll.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        return r.json();
+      })
       .then(function (data) {
         if (data && data.ok && data.version) lastVersion = data.version;
       })

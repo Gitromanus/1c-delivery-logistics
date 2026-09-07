@@ -1,6 +1,8 @@
 /**
- * Метки: номер в рейсе + смена стиля.
- * v2 — корректно снимает старые Placemark с карты.
+ * Метки v3: номер в рейсе, смена стиля.
+ * - снимает и точки, и GeoObjectCollection
+ * - не перерисовывает карту на обычный клик (без мигания)
+ * - подменяет addMarks, чтобы не было «старой» + «новой» метки
  */
 (function () {
   var STYLE_KEY = 'logistics-marker-style';
@@ -30,6 +32,8 @@
       done: 'islands#greenDotIcon'
     }
   };
+
+  var dragging = false;
 
   function getStyleKey() {
     try {
@@ -65,30 +69,27 @@
     return st.assigned;
   }
 
-  function clearPointMarks(map) {
+  /** Удалить всё, кроме полигонов зон */
+  function clearOrderLayers(map) {
     var removeList = [];
     map.geoObjects.each(function (obj) {
       try {
-        if (obj.geometry && obj.geometry.getType && obj.geometry.getType() === 'Point') {
-          removeList.push(obj);
-        }
-      } catch (e) {}
+        var t = obj.geometry && obj.geometry.getType && obj.geometry.getType();
+        if (t === 'Polygon' || t === 'LineString') return;
+        removeList.push(obj);
+      } catch (e) {
+        removeList.push(obj);
+      }
     });
     removeList.forEach(function (obj) {
       try {
         map.geoObjects.remove(obj);
       } catch (e) {}
     });
-    if (window.__orderCollection) {
-      try {
-        map.geoObjects.remove(window.__orderCollection);
-      } catch (e) {}
-      window.__orderCollection = null;
-    }
+    window.__orderCollection = null;
   }
 
-  function clearOrderMarksDict() {
-    // orderMarks объявлен как let в index.php — в том же global lexical env
+  function marksDict() {
     try {
       if (typeof orderMarks !== 'undefined' && orderMarks) {
         Object.keys(orderMarks).forEach(function (k) {
@@ -106,8 +107,8 @@
     if (!map || typeof ymaps === 'undefined') return false;
     if (typeof mapPoints === 'undefined' || !mapPoints) return false;
 
-    clearPointMarks(map);
-    var marks = clearOrderMarksDict();
+    clearOrderLayers(map);
+    var marks = marksDict();
 
     var seq = buildSeqMap();
     var style = getStyleKey();
@@ -140,7 +141,7 @@
       var mark = new ymaps.Placemark(
         [parseFloat(p.lat), parseFloat(p.lon)],
         props,
-        { preset: preset }
+        { preset: preset, zIndex: 700, zIndexHover: 800 }
       );
       mark.__origPreset = preset;
       mark.events.add('click', function () {
@@ -172,26 +173,64 @@
     });
     sel.addEventListener('change', function () {
       setStyleKey(sel.value);
-      var ok = rebuildMarks();
-      if (!ok) alert('Карта ещё не готова, подождите секунду и смените стиль снова.');
+      if (!rebuildMarks()) {
+        alert('Карта ещё не готова — подождите и выберите стиль снова.');
+      }
     });
     toolbar.appendChild(sel);
   }
 
+  /** Не даём штатному addMarks рисовать вторые точки */
+  function patchAddMarks() {
+    if (typeof window.__addMarksPatched !== 'undefined') return;
+    try {
+      if (typeof addMarks === 'function') {
+        window.__origAddMarks = addMarks;
+        // eslint-disable-next-line no-global-assign
+        addMarks = function (map) {
+          window.__logisticsMap = map;
+          rebuildMarks();
+          return window.__orderCollection;
+        };
+        window.__addMarksPatched = true;
+      }
+    } catch (e) {}
+  }
+
   function boot() {
     ensureStyleSwitcher();
+    patchAddMarks();
+
     var tries = 0;
     var t = setInterval(function () {
       tries++;
-      if (rebuildMarks() || tries > 60) clearInterval(t);
-    }, 300);
+      patchAddMarks();
+      if (window.__logisticsMap) {
+        rebuildMarks();
+        clearInterval(t);
+      } else if (tries > 80) {
+        clearInterval(t);
+      }
+    }, 200);
 
-    document.addEventListener('mouseup', function () {
-      setTimeout(rebuildMarks, 150);
-    });
-    document.addEventListener('touchend', function () {
-      setTimeout(rebuildMarks, 150);
-    });
+    // Перерисовка только после DnD, не на каждый клик
+    document.addEventListener(
+      'mousedown',
+      function () {
+        if (document.body.classList.contains('dd-dragging')) dragging = true;
+      },
+      true
+    );
+    document.addEventListener(
+      'mouseup',
+      function () {
+        if (dragging || document.body.classList.contains('dd-dragging')) {
+          dragging = false;
+          setTimeout(rebuildMarks, 200);
+        }
+      },
+      true
+    );
   }
 
   if (document.readyState === 'loading') {
