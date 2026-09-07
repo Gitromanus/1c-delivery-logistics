@@ -75,13 +75,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
   background: transparent; border: 1px solid var(--border); color: var(--text);
 }
 .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
-
-.btn-theme {
-  min-width: 42px;
-  padding: 10px 12px;
-  font-size: 1.1rem;
-  line-height: 1;
-}
+.btn-theme { min-width: 42px; padding: 10px 12px; font-size: 1.1rem; line-height: 1; }
 
 .grid {
   display: grid;
@@ -102,12 +96,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 }
 .panel h2 { font-size: 0.95rem; margin-bottom: 12px; color: var(--muted); font-weight: 600; }
 .map-box {
-  width: 100%;
-  height: 360px;
-  border-radius: 10px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  background: var(--panel-2);
+  width: 100%; height: 360px; border-radius: 10px; overflow: hidden;
+  border: 1px solid var(--border); background: var(--panel-2);
 }
 .zone-card {
   position: relative;
@@ -133,22 +123,15 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 [data-zone-drop].drag-over { outline: 2px dashed var(--accent); outline-offset: -2px; }
 
 .dd-ghost {
-  z-index: 10000;
-  opacity: 1;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
-  cursor: grabbing;
+  z-index: 10000; opacity: 1; background: var(--card);
+  border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: var(--shadow); cursor: grabbing;
 }
 .dd-dragging, .dd-dragging * { user-select: none; cursor: grabbing; }
 .dd-source { opacity: .35; }
 .dd-gap {
-  height: 4px;
-  background: var(--accent);
-  border-radius: 2px;
-  margin: 6px 2px;
-  pointer-events: none;
+  height: 4px; background: var(--accent); border-radius: 2px;
+  margin: 6px 2px; pointer-events: none;
 }
 .badge {
   display: inline-block; font-size: 0.75rem; padding: 2px 8px;
@@ -161,11 +144,8 @@ table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
 th { color: var(--muted); font-weight: 500; }
 .trip {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
-  margin-bottom: 12px;
-  background: var(--panel);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px; margin-bottom: 12px; background: var(--panel);
 }
 .trip .title { font-weight: 600; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .trip-toggle {
@@ -224,13 +204,9 @@ code { color: var(--accent); font-size: 0.85em; }
   gap: 6px;
 }
 #unassignedZone .drag-order {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 8px !important;
-  margin-bottom: 0 !important;
-  background: var(--card) !important;
-  border-color: var(--border) !important;
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px !important; margin-bottom: 0 !important;
+  background: var(--card) !important; border-color: var(--border) !important;
 }
 #unassignedZone .drag-order > div { min-width: 0; flex: 1; }
 #unassignedZone .drag-order > div > div { line-height: 1.15 !important; }
@@ -238,16 +214,13 @@ code { color: var(--accent); font-size: 0.85em; }
 #unassignedZone .drag-order > div > div:nth-child(2) { font-size: 11px !important; }
 #unassignedZone .drag-order > div > div:nth-child(3) { font-size: 11px !important; margin-top: 1px !important; }
 #unassignedZone .drag-order > span {
-  font-size: 11px !important;
-  padding: 2px 7px !important;
-  background: var(--chip-bg) !important;
-  color: var(--text) !important;
+  font-size: 11px !important; padding: 2px 7px !important;
+  background: var(--chip-bg) !important; color: var(--text) !important;
 }
 @media (max-width: 1300px) {
   #unassignedZone { grid-template-columns: 1fr; }
 }
 
-/* Карточки в рейсах (inline-стили тёмные переопределяем мягко) */
 [data-theme="light"] .drag-order {
   background: var(--card) !important;
   border-color: var(--border) !important;
@@ -256,6 +229,39 @@ code { color: var(--accent); font-size: 0.85em; }
 [data-theme="light"] .drag-order > div > div:first-child { color: var(--text) !important; }
 [data-theme="light"] .drag-order > div > div:nth-child(2) { color: var(--muted) !important; }
 [data-theme="light"] .drag-order > span {
-  background: var(--chip-bg) !important;
-  color: var(--text) !important;
+  background: var(--chip-bg) !important; color: var(--text) !important;
+}
+
+/* Компактные метки: заявки / загрузка / машины */
+.meta-orders {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.85rem; color: var(--muted); font-weight: 600;
+}
+.zone-cap {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px 12px; margin-top: 8px;
+  font-size: 0.78rem; color: var(--muted); font-weight: 600;
+}
+.cap-load, .cap-veh, .trip-weight {
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.ic {
+  display: inline-block;
+  width: 14px; height: 14px; flex: 0 0 14px;
+  opacity: 0.9;
+  background: currentColor;
+  -webkit-mask: center / contain no-repeat;
+  mask: center / contain no-repeat;
+}
+.ic-scale {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 20h14'/%3E%3Cpath d='M12 4v16'/%3E%3Cpath d='M7 8h10'/%3E%3Cpath d='M8 8c0 2.5-1.5 4-4 4'/%3E%3Cpath d='M16 8c0 2.5 1.5 4 4 4'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 20h14'/%3E%3Cpath d='M12 4v16'/%3E%3Cpath d='M7 8h10'/%3E%3Cpath d='M8 8c0 2.5-1.5 4-4 4'/%3E%3Cpath d='M16 8c0 2.5 1.5 4 4 4'/%3E%3C/svg%3E");
+}
+.ic-truck {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2'/%3E%3Cpath d='M15 18H9'/%3E%3Cpath d='M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14'/%3E%3Ccircle cx='17' cy='18' r='2'/%3E%3Ccircle cx='7' cy='18' r='2'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2'/%3E%3Cpath d='M15 18H9'/%3E%3Cpath d='M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14'/%3E%3Ccircle cx='17' cy='18' r='2'/%3E%3Ccircle cx='7' cy='18' r='2'/%3E%3C/svg%3E");
+}
+.ic-box {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/%3E%3Cpath d='M3.27 6.96 12 12.01l8.73-5.05'/%3E%3Cpath d='M12 22.08V12'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/%3E%3Cpath d='M3.27 6.96 12 12.01l8.73-5.05'/%3E%3Cpath d='M12 22.08V12'/%3E%3C/svg%3E");
 }
