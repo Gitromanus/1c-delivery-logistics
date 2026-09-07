@@ -1,6 +1,4 @@
-/**
- * live.js v4 — тема, рейсы, poll, compact, map markers
- */
+/** live.js v5 */
 (function () {
   function loadScript(id, src) {
     if (document.getElementById(id)) return;
@@ -9,8 +7,8 @@
     s.src = src;
     document.head.appendChild(s);
   }
-  loadScript('desk-compact-v2', 'assets/js/desk-compact-v2.js?v=4');
-  loadScript('map-markers', 'assets/js/map-markers.js?v=1');
+  loadScript('desk-compact-v2', 'assets/js/desk-compact-v2.js?v=5');
+  loadScript('map-markers', 'assets/js/map-markers.js?v=2');
 
   var THEME_KEY = 'logistics-theme';
   function preferredTheme() {
@@ -62,6 +60,7 @@
   var quietUntil = 0;
   var wasDragging = false;
   var ensureDone = false;
+  var nativeFetch = window.fetch.bind(window);
 
   function isDragging() {
     return document.body.classList.contains('dd-dragging');
@@ -77,7 +76,6 @@
       .catch(function () {});
   };
 
-  var nativeFetch = window.fetch.bind(window);
   window.fetch = function (input, init) {
     var url = typeof input === 'string' ? input : (input && input.url) || '';
     if (url.indexOf('vehicle_zone.php') !== -1 && init && init.body && typeof init.body === 'string') {
@@ -87,13 +85,21 @@
           body.date = date;
           init = Object.assign({}, init, { body: JSON.stringify(body) });
           return nativeFetch(input, init).then(function (res) {
-            return res.clone().json().then(function (data) {
-              if (data && data.ok) {
-                quietUntil = Date.now() + 15000;
-                setTimeout(function () { location.reload(); }, 50);
-              }
-              return res;
-            }).catch(function () { return res; });
+            return res
+              .clone()
+              .json()
+              .then(function (data) {
+                if (data && data.ok) {
+                  quietUntil = Date.now() + 15000;
+                  setTimeout(function () {
+                    location.reload();
+                  }, 50);
+                }
+                return res;
+              })
+              .catch(function () {
+                return res;
+              });
           });
         }
       } catch (e) {}
@@ -104,8 +110,13 @@
   function ensureEmptyTrips() {
     if (ensureDone) return;
     ensureDone = true;
-    nativeFetch('api/ensure_trips.php?date=' + encodeURIComponent(date), { method: 'POST', cache: 'no-store' })
-      .then(function (r) { return r.json(); })
+    nativeFetch('api/ensure_trips.php?date=' + encodeURIComponent(date), {
+      method: 'POST',
+      cache: 'no-store'
+    })
+      .then(function (r) {
+        return r.json();
+      })
       .then(function (data) {
         if (data && data.ok && data.created > 0) {
           quietUntil = Date.now() + 5000;
@@ -126,7 +137,9 @@
       return;
     }
     nativeFetch('api/desk_poll.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        return r.json();
+      })
       .then(function (data) {
         if (!data || !data.ok || !data.version) return;
         if (lastVersion === null) {
