@@ -1,6 +1,6 @@
 <?php
 /**
- * Админка: кэш admin_app.full.php; при отсутствии — скачать из GitHub + theme.js
+ * Админка: кэш UI + скрипты темы и настроек меток.
  */
 $cache = __DIR__ . '/admin_app.full.php';
 
@@ -27,16 +27,35 @@ if (!is_file($cache) || filesize($cache) < 5000) {
     if ($data === false) {
         http_response_code(500);
         header('Content-Type: text/plain; charset=utf-8');
-        echo "Не удалось загрузить admin UI с GitHub (нужен исходящий HTTPS с хостинга).\n";
-        echo "Залейте вручную файл admin_app.full.php (полный index админки) в папку admin/.\n";
+        echo "Не удалось загрузить admin UI с GitHub.\n";
+        echo "Положите полный файл админки как admin/admin_app.full.php\n";
         exit;
-    }
-    $needle = '<link rel="stylesheet" href="../assets/css/style.css">';
-    $inject = $needle . "\n  <script src=\"../assets/js/theme.js\"></script>";
-    if (strpos($data, 'theme.js') === false) {
-        $data = str_replace($needle, $inject, $data);
     }
     file_put_contents($cache, $data);
 }
 
-require $cache;
+$html = file_get_contents($cache);
+
+// Тема
+if (strpos($html, 'theme.js') === false) {
+    $html = str_replace(
+        '<link rel="stylesheet" href="../assets/css/style.css">',
+        '<link rel="stylesheet" href="../assets/css/style.css">' . "\n  <script src=\"../assets/js/theme.js\"></script>",
+        $html
+    );
+}
+
+// Настройки меток
+if (strpos($html, 'admin-settings.js') === false) {
+    if (stripos($html, '</body>') !== false) {
+        $html = str_ireplace(
+            '</body>',
+            "  <script src=\"../assets/js/admin-settings.js?v=1\"></script>\n</body>",
+            $html
+        );
+    } else {
+        $html .= "\n<script src=\"../assets/js/admin-settings.js?v=1\"></script>\n";
+    }
+}
+
+echo $html;

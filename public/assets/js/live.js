@@ -1,4 +1,4 @@
-/** live.js v7 */
+/** live.js v8 */
 (function () {
   function loadScript(id, src) {
     if (document.getElementById(id)) return;
@@ -8,7 +8,7 @@
     document.head.appendChild(s);
   }
   loadScript('desk-compact-v2', 'assets/js/desk-compact-v2.js?v=7');
-  loadScript('map-markers', 'assets/js/map-markers.js?v=3');
+  loadScript('map-markers', 'assets/js/map-markers.js?v=4');
 
   var THEME_KEY = 'logistics-theme';
   function preferredTheme() {

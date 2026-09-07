@@ -1,32 +1,25 @@
 /**
- * Метки v3: номер в рейсе, смена стиля.
- * - снимает и точки, и GeoObjectCollection
- * - не перерисовывает карту на обычный клик (без мигания)
- * - подменяет addMarks, чтобы не было «старой» + «новой» метки
+ * Метки v4: номер в рейсе. Стиль задаётся в админке (localStorage).
  */
 (function () {
   var STYLE_KEY = 'logistics-marker-style';
   var STYLES = {
     circle: {
-      name: 'Круг с номером',
       assigned: 'islands#blueCircleIcon',
       neu: 'islands#orangeCircleIcon',
       done: 'islands#greenCircleIcon'
     },
     pin: {
-      name: 'Метка с номером',
       assigned: 'islands#blueIcon',
       neu: 'islands#orangeIcon',
       done: 'islands#greenIcon'
     },
     stretchy: {
-      name: 'Широкая с номером',
       assigned: 'islands#blueStretchyIcon',
       neu: 'islands#orangeStretchyIcon',
       done: 'islands#greenStretchyIcon'
     },
     dot: {
-      name: 'Точка',
       assigned: 'islands#blueDotIcon',
       neu: 'islands#orangeDotIcon',
       done: 'islands#greenDotIcon'
@@ -41,12 +34,6 @@
       if (s && STYLES[s]) return s;
     } catch (e) {}
     return 'circle';
-  }
-
-  function setStyleKey(k) {
-    try {
-      localStorage.setItem(STYLE_KEY, k);
-    } catch (e) {}
   }
 
   function buildSeqMap() {
@@ -69,7 +56,6 @@
     return st.assigned;
   }
 
-  /** Удалить всё, кроме полигонов зон */
   function clearOrderLayers(map) {
     var removeList = [];
     map.geoObjects.each(function (obj) {
@@ -155,38 +141,11 @@
     return true;
   }
 
-  function ensureStyleSwitcher() {
-    if (document.getElementById('markerStyle')) return;
-    var toolbar = document.querySelector('.toolbar');
-    if (!toolbar) return;
-    var sel = document.createElement('select');
-    sel.id = 'markerStyle';
-    sel.title = 'Стиль меток на карте';
-    sel.style.maxWidth = '170px';
-    var cur = getStyleKey();
-    Object.keys(STYLES).forEach(function (k) {
-      var opt = document.createElement('option');
-      opt.value = k;
-      opt.textContent = STYLES[k].name;
-      if (k === cur) opt.selected = true;
-      sel.appendChild(opt);
-    });
-    sel.addEventListener('change', function () {
-      setStyleKey(sel.value);
-      if (!rebuildMarks()) {
-        alert('Карта ещё не готова — подождите и выберите стиль снова.');
-      }
-    });
-    toolbar.appendChild(sel);
-  }
-
-  /** Не даём штатному addMarks рисовать вторые точки */
   function patchAddMarks() {
-    if (typeof window.__addMarksPatched !== 'undefined') return;
+    if (window.__addMarksPatched) return;
     try {
       if (typeof addMarks === 'function') {
         window.__origAddMarks = addMarks;
-        // eslint-disable-next-line no-global-assign
         addMarks = function (map) {
           window.__logisticsMap = map;
           rebuildMarks();
@@ -197,14 +156,21 @@
     } catch (e) {}
   }
 
+  // Убрать старый селект стиля с рабочего стола, если остался в DOM
+  function removeDeskSwitcher() {
+    var el = document.getElementById('markerStyle');
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  }
+
   function boot() {
-    ensureStyleSwitcher();
+    removeDeskSwitcher();
     patchAddMarks();
 
     var tries = 0;
     var t = setInterval(function () {
       tries++;
       patchAddMarks();
+      removeDeskSwitcher();
       if (window.__logisticsMap) {
         rebuildMarks();
         clearInterval(t);
@@ -213,7 +179,6 @@
       }
     }, 200);
 
-    // Перерисовка только после DnD, не на каждый клик
     document.addEventListener(
       'mousedown',
       function () {
