@@ -1,6 +1,7 @@
 /**
- * Настройки в админке: стиль меток на карте рабочего стола.
- * Пишет в localStorage (logistics-marker-style) — тот же ключ, что читает map-markers.js
+ * Админка:
+ * - стиль меток в шапке (компактно)
+ * - сетка: зоны | машины | привязки в один ряд
  */
 (function () {
   var STYLE_KEY = 'logistics-marker-style';
@@ -25,30 +26,75 @@
     } catch (e) {}
   }
 
-  function mount() {
+  function injectLayoutCss() {
+    if (document.getElementById('admin-layout-css')) return;
+    var css = document.createElement('style');
+    css.id = 'admin-layout-css';
+    css.textContent =
+      /* Три колонки: зоны, машины, привязки */
+      '.admin-grid-top{' +
+      'display:grid!important;' +
+      'grid-template-columns:repeat(3,minmax(0,1fr))!important;' +
+      'gap:16px!important;' +
+      'align-items:start!important;' +
+      'margin-bottom:16px!important;' +
+      '}' +
+      '@media(max-width:1100px){.admin-grid-top{grid-template-columns:1fr!important;}}' +
+      /* Скрыть старый блок настроек меток, если всплыл посередине */
+      '#adminMarkerStyleBlock{display:none!important;}' +
+      /* Компактный селект в шапке */
+      '.admin-marker-wrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}' +
+      '.admin-marker-wrap label{font-size:0.8rem;color:var(--muted);white-space:nowrap;}' +
+      '.admin-marker-wrap select{max-width:180px;padding:8px 10px;font-size:0.85rem;}';
+    document.head.appendChild(css);
+  }
+
+  function wrapTopPanels() {
+    var panels = Array.prototype.slice.call(document.querySelectorAll('.app > .panel, .app .panel'));
+    // Ищем панели по заголовкам
+    var zones = null;
+    var vehicles = null;
+    var binds = null;
+    document.querySelectorAll('.panel').forEach(function (p) {
+      var h = (p.querySelector('h2,h3,.panel-head') || p).textContent || '';
+      if (/Зон/i.test(h) && !zones) zones = p;
+      else if (/Машин/i.test(h) && !vehicles) vehicles = p;
+      else if (/Привяз/i.test(h) && !binds) binds = p;
+    });
+    if (!zones || !vehicles || !binds) return;
+    if (zones.parentNode && zones.parentNode.classList.contains('admin-grid-top')) return;
+
+    var wrap = document.createElement('div');
+    wrap.className = 'admin-grid-top';
+    var parent = zones.parentNode;
+    parent.insertBefore(wrap, zones);
+    wrap.appendChild(zones);
+    wrap.appendChild(vehicles);
+    wrap.appendChild(binds);
+  }
+
+  function mountMarkerInHeader() {
     if (document.getElementById('adminMarkerStyle')) return;
 
-    // Блок настроек на странице админки
-    var host =
-      document.querySelector('.panel') ||
-      document.querySelector('.app') ||
-      document.body;
+    // Убрать старый блок, если был
+    var old = document.getElementById('adminMarkerStyleBlock');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
 
-    var box = document.createElement('div');
-    box.className = 'panel';
-    box.style.marginTop = '16px';
-    box.innerHTML =
-      '<h2 style="margin-bottom:10px">Карта рабочего стола</h2>' +
-      '<label class="muted" for="adminMarkerStyle">Стиль меток заявок</label><br>' +
-      '<select id="adminMarkerStyle" style="margin-top:8px;min-width:220px"></select>' +
-      '<p class="muted" style="margin-top:10px;font-size:0.8rem">Настройка сохраняется в этом браузере и применяется на рабочем столе.</p>';
+    var toolbar =
+      document.querySelector('.toolbar') ||
+      document.querySelector('.header') ||
+      document.querySelector('.admin-nav');
 
-    // Вставить после первого panel или в конец app
-    var firstPanel = document.querySelector('.panel');
-    if (firstPanel && firstPanel.parentNode) {
-      firstPanel.parentNode.insertBefore(box, firstPanel.nextSibling);
+    var wrap = document.createElement('div');
+    wrap.className = 'admin-marker-wrap';
+    wrap.innerHTML =
+      '<label for="adminMarkerStyle">Метки</label>' +
+      '<select id="adminMarkerStyle" title="Стиль меток на рабочем столе"></select>';
+
+    if (toolbar) {
+      toolbar.insertBefore(wrap, toolbar.firstChild);
     } else {
-      host.appendChild(box);
+      document.body.insertBefore(wrap, document.body.firstChild);
     }
 
     var sel = document.getElementById('adminMarkerStyle');
@@ -62,19 +108,18 @@
     });
     sel.addEventListener('change', function () {
       setStyle(sel.value);
-      var note = document.createElement('div');
-      note.className = 'flash flash-ok';
-      note.textContent = 'Стиль меток сохранён. Обновите рабочий стол, если он уже открыт.';
-      box.appendChild(note);
-      setTimeout(function () {
-        if (note.parentNode) note.parentNode.removeChild(note);
-      }, 3500);
     });
   }
 
+  function boot() {
+    injectLayoutCss();
+    wrapTopPanels();
+    mountMarkerInHeader();
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', mount);
+    document.addEventListener('DOMContentLoaded', boot);
   } else {
-    mount();
+    boot();
   }
 })();
