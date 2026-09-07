@@ -35,6 +35,9 @@ require_once $srcDir . '/Database.php';
 require_once $srcDir . '/ZoneMatcher.php';
 require_once $srcDir . '/TripBuilder.php';
 require_once $srcDir . '/Geocoder.php';
+if (is_file($srcDir . '/EnsureTrips.php')) {
+    require_once $srcDir . '/EnsureTrips.php';
+}
 
 if (!defined('APP_ROOT')) {
     define('APP_ROOT', dirname($configPath));
