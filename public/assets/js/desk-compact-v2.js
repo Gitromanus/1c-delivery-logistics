@@ -1,5 +1,6 @@
 /**
- * Компактные подписи + Навигатор (иконка) + порядок кнопок в шапке рейса.
+ * Компактные подписи + Навигатор + порядок кнопок рейса.
+ * Зона: в одном ряду загрузка · машины · заявки
  */
 (function () {
   var IC_SCALE = '<span class="ic ic-scale" aria-hidden="true"></span>';
@@ -12,33 +13,51 @@
   var busy = false;
   var timer = null;
 
-  function compactMeta(el) {
-    if (!el || el.getAttribute('data-compact') === '1') return;
-    var t = (el.textContent || '').trim();
-    var m = t.match(/(\d+)\s*заявок?/i) || t.match(/^(\d+)$/);
-    if (!m) return;
-    el.classList.add('meta-orders');
-    el.title = 'Заявок';
-    el.innerHTML = IC_BOX + m[1];
-    el.setAttribute('data-compact', '1');
-  }
+  function compactZoneCard(card) {
+    if (!card || card.getAttribute('data-zone-compact') === '1') return;
 
-  function compactCap(el) {
-    if (!el || el.getAttribute('data-compact') === '1') return;
-    if (el.querySelector('.cap-load')) {
-      el.setAttribute('data-compact', '1');
-      return;
+    var meta = card.querySelector('.meta');
+    var cap = card.querySelector('.zone-cap');
+    if (!cap) return;
+
+    var orders = null;
+    if (meta) {
+      var tm = (meta.textContent || '').trim();
+      var mo = tm.match(/(\d+)\s*заявок?/i) || tm.match(/^(\d+)$/);
+      if (mo) orders = mo[1];
+      // убрать отдельную строку «N заявок»
+      meta.style.display = 'none';
     }
-    var t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+    // data-order-w на карточке — вес, не количество; число заявок только из meta
+
+    var t = (cap.textContent || '').replace(/\s+/g, ' ').trim();
     var load = t.match(/([\d\s]+)\s*\/\s*([\d\s]+)/);
     var veh = t.match(/машин[аы]?\s*:\s*(\d+)/i);
+    // уже компактный HTML?
+    if (cap.querySelector('.cap-load')) {
+      if (orders != null && !cap.querySelector('.cap-orders')) {
+        var span = document.createElement('span');
+        span.className = 'cap-orders meta-orders';
+        span.title = 'Заявок';
+        span.innerHTML = IC_BOX + orders;
+        cap.appendChild(span);
+      }
+      card.setAttribute('data-zone-compact', '1');
+      return;
+    }
     if (!load) return;
+
     var a = load[1].replace(/\s/g, '\u00a0').trim();
     var b = load[2].replace(/\s/g, '\u00a0').trim().replace(/\s*кг$/i, '');
     var html = '<span class="cap-load" title="Загрузка, кг">' + IC_SCALE + a + ' / ' + b + '</span>';
-    if (veh) html += '<span class="cap-veh" title="Машин">' + IC_TRUCK + veh[1] + '</span>';
-    el.innerHTML = html;
-    el.setAttribute('data-compact', '1');
+    if (veh) {
+      html += '<span class="cap-veh" title="Машин">' + IC_TRUCK + veh[1] + '</span>';
+    }
+    if (orders != null) {
+      html += '<span class="cap-orders meta-orders" title="Заявок">' + IC_BOX + orders + '</span>';
+    }
+    cap.innerHTML = html;
+    card.setAttribute('data-zone-compact', '1');
   }
 
   function compactTripWeight(el) {
@@ -98,14 +117,12 @@
     return 'https://yandex.ru/maps/?rtext=' + parts.join('~') + '&rtt=auto';
   }
 
-  /** Порядок в шапке: название | … | Навигатор | Свернуть */
   function layoutTripTitle(trip) {
     var title = trip.querySelector('.title');
     if (!title) return;
 
     var nameEl = title.querySelector('.trip-name');
     if (!nameEl) {
-      // первая «текстовая» нода / span без класса кнопок
       var kids = Array.prototype.slice.call(title.childNodes);
       for (var i = 0; i < kids.length; i++) {
         var n = kids[i];
@@ -134,11 +151,8 @@
 
     var toggle = title.querySelector('.trip-toggle') || actions.querySelector('.trip-toggle');
     var navi = title.querySelector('.btn-navi') || actions.querySelector('.btn-navi');
-
     if (navi && navi.parentNode !== actions) actions.appendChild(navi);
     if (toggle && toggle.parentNode !== actions) actions.appendChild(toggle);
-
-    // жёсткий порядок: navi, потом toggle
     if (navi) actions.appendChild(navi);
     if (toggle) actions.appendChild(toggle);
   }
@@ -163,9 +177,8 @@
             alert('У заявок в рейсе нет координат.\nСначала «Геокод с карты».');
             return;
           }
-          var navi = naviUrl(pts);
+          window.location.href = naviUrl(pts);
           var maps = mapsUrl(pts);
-          window.location.href = navi;
           setTimeout(function () {
             if (maps) window.open(maps, '_blank');
           }, 700);
@@ -180,7 +193,6 @@
           existing.setAttribute('aria-label', 'Навигатор');
         }
       }
-
       layoutTripTitle(trip);
     });
   }
@@ -189,8 +201,16 @@
     if (busy) return;
     busy = true;
     try {
-      document.querySelectorAll('.zone-card .meta').forEach(compactMeta);
-      document.querySelectorAll('.zone-cap').forEach(compactCap);
+      document.querySelectorAll('.zone-card').forEach(function (card) {
+        // после DnD refreshZone сбрасывает HTML — снимаем флаг
+        var cap = card.querySelector('.zone-cap');
+        if (cap && !cap.querySelector('.cap-load') && card.getAttribute('data-zone-compact') === '1') {
+          card.removeAttribute('data-zone-compact');
+          var meta = card.querySelector('.meta');
+          if (meta) meta.style.display = '';
+        }
+        compactZoneCard(card);
+      });
       document.querySelectorAll('.trip-weight').forEach(compactTripWeight);
       addNaviButtons();
     } finally {
