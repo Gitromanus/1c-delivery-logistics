@@ -1,4 +1,4 @@
-/** live.js v6 */
+/** live.js v7 */
 (function () {
   function loadScript(id, src) {
     if (document.getElementById(id)) return;
@@ -7,7 +7,7 @@
     s.src = src;
     document.head.appendChild(s);
   }
-  loadScript('desk-compact-v2', 'assets/js/desk-compact-v2.js?v=6');
+  loadScript('desk-compact-v2', 'assets/js/desk-compact-v2.js?v=7');
   loadScript('map-markers', 'assets/js/map-markers.js?v=3');
 
   var THEME_KEY = 'logistics-theme';
@@ -21,9 +21,7 @@
   }
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
-    try {
-      localStorage.setItem(THEME_KEY, theme);
-    } catch (e) {}
+    try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
     var btn = document.getElementById('themeToggle');
     if (btn) {
       btn.textContent = theme === 'light' ? '🌙' : '☀️';
@@ -71,9 +69,7 @@
   window.deskAckLocalChange = function () {
     quietUntil = Date.now() + 30000;
     nativeFetch('api/desk_poll.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
-      .then(function (r) {
-        return r.json();
-      })
+      .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data && data.ok && data.version) lastVersion = data.version;
       })
@@ -89,21 +85,13 @@
           body.date = date;
           init = Object.assign({}, init, { body: JSON.stringify(body) });
           return nativeFetch(input, init).then(function (res) {
-            return res
-              .clone()
-              .json()
-              .then(function (data) {
-                if (data && data.ok) {
-                  quietUntil = Date.now() + 15000;
-                  setTimeout(function () {
-                    location.reload();
-                  }, 50);
-                }
-                return res;
-              })
-              .catch(function () {
-                return res;
-              });
+            return res.clone().json().then(function (data) {
+              if (data && data.ok) {
+                quietUntil = Date.now() + 15000;
+                setTimeout(function () { location.reload(); }, 50);
+              }
+              return res;
+            }).catch(function () { return res; });
           });
         }
       } catch (e) {}
@@ -114,13 +102,8 @@
   function ensureEmptyTrips() {
     if (ensureDone) return;
     ensureDone = true;
-    nativeFetch('api/ensure_trips.php?date=' + encodeURIComponent(date), {
-      method: 'POST',
-      cache: 'no-store'
-    })
-      .then(function (r) {
-        return r.json();
-      })
+    nativeFetch('api/ensure_trips.php?date=' + encodeURIComponent(date), { method: 'POST', cache: 'no-store' })
+      .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data && data.ok && data.created > 0) {
           quietUntil = Date.now() + 5000;
@@ -141,9 +124,7 @@
       return;
     }
     nativeFetch('api/desk_poll.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
-      .then(function (r) {
-        return r.json();
-      })
+      .then(function (r) { return r.json(); })
       .then(function (data) {
         if (!data || !data.ok || !data.version) return;
         if (lastVersion === null) {
