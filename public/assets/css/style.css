@@ -1,6 +1,9 @@
-:root {
+/* Тёмная тема по умолчанию */
+:root,
+[data-theme="dark"] {
   --bg: #0f1117;
   --panel: #1a1d27;
+  --panel-2: #12141c;
   --border: #2a2e3a;
   --text: #e8eaed;
   --muted: #9aa0a6;
@@ -8,7 +11,29 @@
   --warn: #f59e0b;
   --danger: #f87171;
   --radius: 12px;
+  --shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+  --card: #1c2130;
+  --chip-bg: #12141c;
+  --color-scheme: dark;
 }
+
+[data-theme="light"] {
+  --bg: #f0f2f5;
+  --panel: #ffffff;
+  --panel-2: #f5f6f8;
+  --border: #d8dde6;
+  --text: #1a1d26;
+  --muted: #6b7280;
+  --accent: #16a34a;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --radius: 12px;
+  --shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+  --card: #ffffff;
+  --chip-bg: #eef1f6;
+  --color-scheme: light;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
@@ -16,6 +41,8 @@ body {
   color: var(--text);
   min-height: 100vh;
   line-height: 1.45;
+  color-scheme: var(--color-scheme);
+  transition: background 0.2s ease, color 0.15s ease;
 }
 a { color: var(--accent); text-decoration: none; }
 .app { max-width: 1280px; margin: 0 auto; padding: 20px 16px 48px; }
@@ -26,13 +53,18 @@ a { color: var(--accent); text-decoration: none; }
 .logo { font-weight: 700; font-size: 1.15rem; }
 .logo span { color: var(--accent); }
 .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
 input[type="date"], input[type="text"], input[type="number"], input[type="password"], select, textarea {
-  background: #12141c; border: 1px solid var(--border); color: var(--text);
-  border-radius: 8px; padding: 10px 12px; font: inherit;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
 }
-/* В темной теме иконка календаря браузера по умолчанию черная — делаем её видимой */
-input[type="date"] { color-scheme: dark; cursor: pointer; }
+input[type="date"] { color-scheme: var(--color-scheme); cursor: pointer; }
 input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
+
 .btn {
   border: none; border-radius: 8px; padding: 10px 16px; font-weight: 600;
   cursor: pointer; font: inherit;
@@ -43,6 +75,14 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
   background: transparent; border: 1px solid var(--border); color: var(--text);
 }
 .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+.btn-theme {
+  min-width: 42px;
+  padding: 10px 12px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
 .grid {
   display: grid;
   grid-template-columns: 260px minmax(0,1fr) 340px;
@@ -52,7 +92,6 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
   .grid { grid-template-columns: 1fr; }
 }
 
-/* Рабочий стол: растянут на всю ширину экрана */
 .app.wide { max-width: none; padding-top: 12px; }
 .app.wide .map-box { height: 48vh; min-height: 360px; }
 .panel {
@@ -68,7 +107,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid var(--border);
-  background: #12141c;
+  background: var(--panel-2);
 }
 .zone-card {
   position: relative;
@@ -76,6 +115,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
   border-radius: 10px;
   padding: 12px;
   margin-bottom: 10px;
+  background: var(--panel);
 }
 .zone-card .name { font-weight: 600; margin-bottom: 4px; }
 .zone-card .meta { font-size: 0.85rem; color: var(--muted); }
@@ -84,7 +124,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 .zone-empty { font-size: 0.78rem; }
 .veh-chip {
   display: inline-flex; align-items: center; gap: 6px;
-  background: #12141c; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--chip-bg); border: 1px solid var(--border); border-radius: 8px;
   padding: 4px 8px; cursor: grab; font-size: 0.78rem; color: var(--text);
   user-select: none;
 }
@@ -92,14 +132,13 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 .veh-chip .veh-cap { color: var(--muted); font-weight: 600; }
 [data-zone-drop].drag-over { outline: 2px dashed var(--accent); outline-offset: -2px; }
 
-/* Кастомное перетаскивание (непрозрачная карточка + место вставки) */
 .dd-ghost {
   z-index: 10000;
   opacity: 1;
-  background: #1c2130;
+  background: var(--card);
   border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 10px 24px rgba(0,0,0,.55);
+  box-shadow: var(--shadow);
   cursor: grabbing;
 }
 .dd-dragging, .dd-dragging * { user-select: none; cursor: grabbing; }
@@ -126,6 +165,7 @@ th { color: var(--muted); font-weight: 500; }
   border-radius: 10px;
   padding: 12px;
   margin-bottom: 12px;
+  background: var(--panel);
 }
 .trip .title { font-weight: 600; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .trip-toggle {
@@ -135,10 +175,10 @@ th { color: var(--muted); font-weight: 500; }
 .trip-toggle:hover { color: var(--accent); }
 .trip.collapsed .trip-body { display: none; }
 .bar {
-  height: 8px; background: #12141c; border-radius: 4px; overflow: hidden; margin: 8px 0;
+  height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin: 8px 0;
 }
 .bar > i { display: block; height: 100%; background: var(--accent); }
-.bar.over > i { background: #ef4444; }
+.bar.over > i { background: var(--danger); }
 .muted { color: var(--muted); font-size: 0.85rem; }
 .footer { margin-top: 24px; color: var(--muted); font-size: 0.8rem; text-align: center; }
 .admin-nav { margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; }
@@ -147,7 +187,6 @@ th { color: var(--muted); font-weight: 500; }
 .flash-err { background: rgba(248,113,113,.12); color: var(--danger); }
 code { color: var(--accent); font-size: 0.85em; }
 
-/* Админка: шапка панели, удаление, модалки */
 .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; }
 .panel-head h2 { margin-bottom: 0; }
 .btn-sm { padding: 6px 10px; font-size: 0.8rem; }
@@ -165,20 +204,20 @@ code { color: var(--accent); font-size: 0.85em; }
 .btn-icon:hover { background: rgba(34,197,94,.15); color: var(--accent); }
 .modal-overlay {
   display: none; position: fixed; inset: 0; z-index: 1000;
-  background: rgba(0,0,0,.55);
+  background: rgba(0,0,0,.45);
   align-items: center; justify-content: center; padding: 16px;
 }
 .modal-overlay.open { display: flex; }
 .modal {
   background: var(--panel); border: 1px solid var(--border);
   border-radius: 12px; padding: 20px; width: 100%; max-width: 380px;
+  box-shadow: var(--shadow);
 }
 .modal h3 { font-size: 1rem; margin-bottom: 4px; }
 .modal label { display: block; color: var(--muted); font-size: 0.8rem; margin: 12px 0 4px; }
 .modal input[type="text"], .modal input[type="number"], .modal select { width: 100%; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
 
-/* Нераспределённые заявки: компактные карточки в 2 колонки */
 #unassignedZone {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -190,13 +229,33 @@ code { color: var(--accent); font-size: 0.85em; }
   gap: 8px;
   padding: 5px 8px !important;
   margin-bottom: 0 !important;
+  background: var(--card) !important;
+  border-color: var(--border) !important;
 }
 #unassignedZone .drag-order > div { min-width: 0; flex: 1; }
 #unassignedZone .drag-order > div > div { line-height: 1.15 !important; }
 #unassignedZone .drag-order > div > div:nth-child(1) { font-size: 12px !important; }
 #unassignedZone .drag-order > div > div:nth-child(2) { font-size: 11px !important; }
 #unassignedZone .drag-order > div > div:nth-child(3) { font-size: 11px !important; margin-top: 1px !important; }
-#unassignedZone .drag-order > span { font-size: 11px !important; padding: 2px 7px !important; }
+#unassignedZone .drag-order > span {
+  font-size: 11px !important;
+  padding: 2px 7px !important;
+  background: var(--chip-bg) !important;
+  color: var(--text) !important;
+}
 @media (max-width: 1300px) {
   #unassignedZone { grid-template-columns: 1fr; }
+}
+
+/* Карточки в рейсах (inline-стили тёмные переопределяем мягко) */
+[data-theme="light"] .drag-order {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06) !important;
+}
+[data-theme="light"] .drag-order > div > div:first-child { color: var(--text) !important; }
+[data-theme="light"] .drag-order > div > div:nth-child(2) { color: var(--muted) !important; }
+[data-theme="light"] .drag-order > span {
+  background: var(--chip-bg) !important;
+  color: var(--text) !important;
 }
