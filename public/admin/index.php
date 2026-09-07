@@ -1,7 +1,6 @@
 <?php
 /**
- * Админка: полный UI в admin_app.full.php (кэш),
- * при отсутствии — скачать с GitHub и выполнить через require.
+ * Админка: UI в admin_app.full.php, скрипты подмешиваются в кэш.
  */
 $cache = __DIR__ . '/admin_app.full.php';
 
@@ -29,7 +28,6 @@ if (!is_file($cache) || filesize($cache) < 5000) {
         http_response_code(500);
         header('Content-Type: text/plain; charset=utf-8');
         echo "Не удалось загрузить admin UI с GitHub.\n";
-        echo "Положите полный файл админки как admin/admin_app.full.php\n";
         exit;
     }
     file_put_contents($cache, $data);
@@ -47,25 +45,20 @@ if (strpos($html, 'theme.js') === false) {
     }
 }
 
-// Всегда актуальная версия admin-settings
 if (strpos($html, 'admin-settings.js') === false) {
     if (stripos($html, '</body>') !== false) {
         $html = str_ireplace(
             '</body>',
-            "  <script src=\"../assets/js/admin-settings.js?v=2\"></script>\n</body>",
+            "  <script src=\"../assets/js/admin-settings.js?v=3\"></script>\n</body>",
             $html
         );
         $changed = true;
     } else {
-        $html .= "\n<script src=\"../assets/js/admin-settings.js?v=2\"></script>\n";
+        $html .= "\n<script src=\"../assets/js/admin-settings.js?v=3\"></script>\n";
         $changed = true;
     }
 } else {
-    $newHtml = preg_replace(
-        '#admin-settings\.js(\?v=\d+)?#',
-        'admin-settings.js?v=2',
-        $html
-    );
+    $newHtml = preg_replace('#admin-settings\.js(\?v=\d+)?#', 'admin-settings.js?v=3', $html);
     if ($newHtml !== $html) {
         $html = $newHtml;
         $changed = true;

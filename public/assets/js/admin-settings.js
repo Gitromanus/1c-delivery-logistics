@@ -1,7 +1,7 @@
 /**
- * Админка:
- * - стиль меток в шапке (компактно)
- * - сетка: зоны | машины | привязки в один ряд
+ * Админка v3:
+ * - метки в шапке
+ * - зоны | машины | привязки в один ряд без наложений
  */
 (function () {
   var STYLE_KEY = 'logistics-marker-style';
@@ -30,53 +30,105 @@
     if (document.getElementById('admin-layout-css')) return;
     var css = document.createElement('style');
     css.id = 'admin-layout-css';
-    css.textContent =
-      /* Три колонки: зоны, машины, привязки */
-      '.admin-grid-top{' +
-      'display:grid!important;' +
-      'grid-template-columns:repeat(3,minmax(0,1fr))!important;' +
-      'gap:16px!important;' +
-      'align-items:start!important;' +
-      'margin-bottom:16px!important;' +
-      '}' +
-      '@media(max-width:1100px){.admin-grid-top{grid-template-columns:1fr!important;}}' +
-      /* Скрыть старый блок настроек меток, если всплыл посередине */
-      '#adminMarkerStyleBlock{display:none!important;}' +
-      /* Компактный селект в шапке */
-      '.admin-marker-wrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}' +
-      '.admin-marker-wrap label{font-size:0.8rem;color:var(--muted);white-space:nowrap;}' +
-      '.admin-marker-wrap select{max-width:180px;padding:8px 10px;font-size:0.85rem;}';
+    css.textContent = [
+      '#adminMarkerStyleBlock{display:none!important;}',
+      '.admin-marker-wrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}',
+      '.admin-marker-wrap label{font-size:0.8rem;color:var(--muted);white-space:nowrap;}',
+      '.admin-marker-wrap select{max-width:180px;padding:8px 10px;font-size:0.85rem;}',
+      /* Ряд из трёх карточек */',
+      '.admin-grid-top{',
+      '  display:grid!important;',
+      '  grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)!important;',
+      '  gap:16px!important;',
+      '  width:100%!important;',
+      '  max-width:100%!important;',
+      '  margin:0 0 16px!important;',
+      '  padding:0!important;',
+      '  align-items:stretch!important;',
+      '  position:relative!important;',
+      '  clear:both!important;',
+      '  float:none!important;',
+      '}',
+      '.admin-grid-top > .panel{',
+      '  position:relative!important;',
+      '  float:none!important;',
+      '  left:auto!important;',
+      '  right:auto!important;',
+      '  top:auto!important;',
+      '  width:auto!important;',
+      '  max-width:100%!important;',
+      '  min-width:0!important;',
+      '  margin:0!important;',
+      '  box-sizing:border-box!important;',
+      '  overflow:auto!important;',
+      '  grid-column:auto!important;',
+      '  grid-row:auto!important;',
+      '}',
+      '.admin-grid-top table{width:100%!important;table-layout:fixed;}',
+      '.admin-grid-top th,.admin-grid-top td{',
+      '  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;',
+      '}',
+      '@media(max-width:1100px){',
+      '  .admin-grid-top{grid-template-columns:1fr!important;}',
+      '}'
+    ].join('\n');
     document.head.appendChild(css);
   }
 
-  function wrapTopPanels() {
-    var panels = Array.prototype.slice.call(document.querySelectorAll('.app > .panel, .app .panel'));
-    // Ищем панели по заголовкам
-    var zones = null;
-    var vehicles = null;
-    var binds = null;
+  function findPanelByTitle(re) {
+    var found = null;
     document.querySelectorAll('.panel').forEach(function (p) {
-      var h = (p.querySelector('h2,h3,.panel-head') || p).textContent || '';
-      if (/Зон/i.test(h) && !zones) zones = p;
-      else if (/Машин/i.test(h) && !vehicles) vehicles = p;
-      else if (/Привяз/i.test(h) && !binds) binds = p;
+      if (found) return;
+      if (p.closest('.admin-grid-top')) return;
+      var head = p.querySelector('.panel-head, h2, h3');
+      var t = head ? head.textContent : p.textContent.slice(0, 80);
+      if (re.test(t || '')) found = p;
     });
+    return found;
+  }
+
+  function wrapTopPanels() {
+    var zones = findPanelByTitle(/^\s*Зон/i);
+    var vehicles = findPanelByTitle(/^\s*Машин/i);
+    var binds = findPanelByTitle(/Привяз/i);
     if (!zones || !vehicles || !binds) return;
-    if (zones.parentNode && zones.parentNode.classList.contains('admin-grid-top')) return;
+
+    // Уже обёрнуты
+    if (
+      zones.parentNode &&
+      zones.parentNode === vehicles.parentNode &&
+      vehicles.parentNode === binds.parentNode &&
+      zones.parentNode.classList.contains('admin-grid-top')
+    ) {
+      return;
+    }
 
     var wrap = document.createElement('div');
     wrap.className = 'admin-grid-top';
+
     var parent = zones.parentNode;
     parent.insertBefore(wrap, zones);
+
+    // Порядок: зоны → машины → привязки
     wrap.appendChild(zones);
     wrap.appendChild(vehicles);
     wrap.appendChild(binds);
+
+    // Сброс инлайнов, если были
+    [zones, vehicles, binds].forEach(function (p) {
+      p.style.position = '';
+      p.style.left = '';
+      p.style.top = '';
+      p.style.width = '';
+      p.style.float = '';
+      p.style.gridColumn = '';
+      p.style.margin = '';
+    });
   }
 
   function mountMarkerInHeader() {
     if (document.getElementById('adminMarkerStyle')) return;
 
-    // Убрать старый блок, если был
     var old = document.getElementById('adminMarkerStyleBlock');
     if (old && old.parentNode) old.parentNode.removeChild(old);
 
@@ -91,11 +143,8 @@
       '<label for="adminMarkerStyle">Метки</label>' +
       '<select id="adminMarkerStyle" title="Стиль меток на рабочем столе"></select>';
 
-    if (toolbar) {
-      toolbar.insertBefore(wrap, toolbar.firstChild);
-    } else {
-      document.body.insertBefore(wrap, document.body.firstChild);
-    }
+    if (toolbar) toolbar.insertBefore(wrap, toolbar.firstChild);
+    else document.body.insertBefore(wrap, document.body.firstChild);
 
     var sel = document.getElementById('adminMarkerStyle');
     var cur = getStyle();
