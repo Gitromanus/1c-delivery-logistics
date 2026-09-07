@@ -1,6 +1,8 @@
 <?php
 /**
- * Админка: кэш UI + скрипты темы и настроек меток.
+ * Админка: полный UI в admin_app.full.php (кэш),
+ * при отсутствии — скачать с GitHub и выполнить через require.
+ * Важно: НЕ echo исходник — иначе PHP выведется текстом на страницу.
  */
 $cache = __DIR__ . '/admin_app.full.php';
 
@@ -34,18 +36,19 @@ if (!is_file($cache) || filesize($cache) < 5000) {
     file_put_contents($cache, $data);
 }
 
+// Подмешать скрипты в кэш-файл (один раз), затем require — PHP выполнится
 $html = file_get_contents($cache);
+$changed = false;
 
-// Тема
 if (strpos($html, 'theme.js') === false) {
-    $html = str_replace(
-        '<link rel="stylesheet" href="../assets/css/style.css">',
-        '<link rel="stylesheet" href="../assets/css/style.css">' . "\n  <script src=\"../assets/js/theme.js\"></script>",
-        $html
-    );
+    $needle = '<link rel="stylesheet" href="../assets/css/style.css">';
+    $inject = $needle . "\n  <script src=\"../assets/js/theme.js\"></script>";
+    if (strpos($html, $needle) !== false) {
+        $html = str_replace($needle, $inject, $html);
+        $changed = true;
+    }
 }
 
-// Настройки меток
 if (strpos($html, 'admin-settings.js') === false) {
     if (stripos($html, '</body>') !== false) {
         $html = str_ireplace(
@@ -53,9 +56,15 @@ if (strpos($html, 'admin-settings.js') === false) {
             "  <script src=\"../assets/js/admin-settings.js?v=1\"></script>\n</body>",
             $html
         );
+        $changed = true;
     } else {
         $html .= "\n<script src=\"../assets/js/admin-settings.js?v=1\"></script>\n";
+        $changed = true;
     }
 }
 
-echo $html;
+if ($changed) {
+    file_put_contents($cache, $html);
+}
+
+require $cache;
