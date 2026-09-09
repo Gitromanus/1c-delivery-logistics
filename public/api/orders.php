@@ -1,7 +1,7 @@
 <?php
 /**
  * Приём заявок из 1С.
- * При сохранении: геокодирование адреса + определение зоны (полигон или keywords).
+ * Геокод + зона + автопостановка в рейс на дату документа.
  */
 require dirname(__DIR__) . '/bootstrap.php';
 
@@ -10,7 +10,6 @@ header('Content-Type: application/json; charset=utf-8');
 $config = require (defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__)) . '/config.php';
 $apiKey = (string) ($config['api_key'] ?? $config['ApiKey1s'] ?? '');
 $yandexKey = (string) ($config['yandex_geocoder_key'] ?? ($config['yandex_maps_key'] ?? $config['api_key_yandex'] ?? ''));
-// Часто в config лежит только JS-ключ — HTTP-геокодер его не принимает; тогда сработают Photon/Nominatim
 $dadataToken = (string) ($config['dadata_token'] ?? '');
 
 $given = $_SERVER['HTTP_X_API_KEY'] ?? ($_POST['api_key'] ?? '');
@@ -112,8 +111,9 @@ foreach ($items as $i => $row) {
 
     $geoProvider = null;
     $geoError = null;
+    $docDate = !empty($row['doc_date']) ? (string) $row['doc_date'] : date('Y-m-d');
+    $weightKg = isset($row['weight_kg']) ? (float) $row['weight_kg'] : 0;
 
-    // 1) Геокод, если нет координат
     if ($hasCoords && $lat === null && $lon === null) {
         $meta = Geocoder::geocodeWithMeta($address, $yandexKey, $dadataToken);
         if (!empty($meta['point'])) {
@@ -125,7 +125,6 @@ foreach ($items as $i => $row) {
         }
     }
 
-    // 2) Зона: сначала полигон по координатам, иначе keywords адреса
     if ($zoneId === null && $lat !== null && $lon !== null) {
         $zoneId = ZoneMatcher::matchByCoords($pdo, $lat, $lon);
     }
@@ -137,10 +136,10 @@ foreach ($items as $i => $row) {
         $params = [
             ':external_id' => mb_substr((string) $row['external_id'], 0, 100),
             ':number' => isset($row['number']) ? mb_substr((string) $row['number'], 0, 50) : null,
-            ':doc_date' => !empty($row['doc_date']) ? (string) $row['doc_date'] : date('Y-m-d'),
+            ':doc_date' => $docDate,
             ':partner' => isset($row['partner']) ? mb_substr((string) $row['partner'], 0, 255) : null,
             ':address' => $address,
-            ':weight_kg' => isset($row['weight_kg']) ? (float) $row['weight_kg'] : 0,
+            ':weight_kg' => $weightKg,
             ':amount' => isset($row['amount']) ? (float) $row['amount'] : null,
             ':comment' => isset($row['comment']) ? mb_substr((string) $row['comment'], 0, 500) : null,
             ':zone_id' => $zoneId,
@@ -151,11 +150,24 @@ foreach ($items as $i => $row) {
         }
         $upsert->execute($params);
         $saved++;
+
+        $idStmt = $pdo->prepare('SELECT id FROM orders WHERE external_id = ? LIMIT 1');
+        $idStmt->execute([$params[':external_id']]);
+        $orderId = (int) $idStmt->fetchColumn();
+
+        $assign = ['trip_id' => null, 'vehicle_id' => null, 'zone_id' => $zoneId];
+        if ($orderId > 0 && $zoneId && class_exists('OrderAssign')) {
+            $assign = OrderAssign::toTrip($pdo, $orderId, $zoneId, $docDate, $weightKg);
+        }
+
         $details[] = [
             'external_id' => $params[':external_id'],
+            'order_id' => $orderId,
             'lat' => $lat,
             'lon' => $lon,
             'zone_id' => $zoneId,
+            'trip_id' => $assign['trip_id'] ?? null,
+            'vehicle_id' => $assign['vehicle_id'] ?? null,
             'geo_provider' => $geoProvider,
             'geo_error' => $geoError,
         ];
