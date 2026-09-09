@@ -1,4 +1,4 @@
-/** live.js v9 */
+/** live.js v10 — poll, theme, vehicles by date */
 (function () {
   function loadScript(id, src) {
     if (document.getElementById(id)) return;
@@ -66,6 +66,58 @@
     return document.body.classList.contains('dd-dragging');
   }
 
+  /** Расставить чипы машин по зонам рейсов выбранной даты */
+  function placeVehiclesByDate() {
+    nativeFetch('api/desk_vehicles.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data || !data.ok || !data.vehicles) return;
+
+        // Собрать существующие чипы
+        var chips = {};
+        document.querySelectorAll('.veh-chip[data-vehicle-id]').forEach(function (ch) {
+          chips[ch.getAttribute('data-vehicle-id')] = ch;
+        });
+
+        // Очистить контейнеры
+        document.querySelectorAll('.zone-vehicles').forEach(function (box) {
+          box.innerHTML = '';
+        });
+
+        data.vehicles.forEach(function (v) {
+          var zid = String(v.zone_id);
+          var vid = String(v.vehicle_id);
+          var box = document.querySelector('.zone-card[data-zone-drop="' + zid + '"] .zone-vehicles');
+          if (!box) return;
+          var ch = chips[vid];
+          if (!ch) {
+            ch = document.createElement('div');
+            ch.className = 'veh-chip';
+            ch.setAttribute('data-vehicle-id', vid);
+            ch.setAttribute('data-cap', v.capacity_kg);
+            ch.title = 'Перетащите в другую зону';
+            ch.innerHTML =
+              '<span class="veh-name"></span><span class="veh-cap"></span>';
+            ch.querySelector('.veh-name').textContent = v.name;
+            ch.querySelector('.veh-cap').textContent =
+              Math.round(v.capacity_kg).toLocaleString('ru-RU') + ' кг';
+          }
+          ch.setAttribute('data-zone-id', zid);
+          box.appendChild(ch);
+        });
+
+        document.querySelectorAll('.zone-vehicles').forEach(function (box) {
+          if (!box.children.length) {
+            var empty = document.createElement('span');
+            empty.className = 'muted zone-empty';
+            empty.textContent = 'нет машин';
+            box.appendChild(empty);
+          }
+        });
+      })
+      .catch(function () {});
+  }
+
   window.deskAckLocalChange = function () {
     quietUntil = Date.now() + 30000;
     nativeFetch('api/desk_poll.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
@@ -85,13 +137,21 @@
           body.date = date;
           init = Object.assign({}, init, { body: JSON.stringify(body) });
           return nativeFetch(input, init).then(function (res) {
-            return res.clone().json().then(function (data) {
-              if (data && data.ok) {
-                quietUntil = Date.now() + 15000;
-                setTimeout(function () { location.reload(); }, 50);
-              }
-              return res;
-            }).catch(function () { return res; });
+            return res
+              .clone()
+              .json()
+              .then(function (data) {
+                if (data && data.ok) {
+                  quietUntil = Date.now() + 15000;
+                  setTimeout(function () {
+                    location.reload();
+                  }, 50);
+                }
+                return res;
+              })
+              .catch(function () {
+                return res;
+              });
           });
         }
       } catch (e) {}
@@ -102,8 +162,13 @@
   function ensureEmptyTrips() {
     if (ensureDone) return;
     ensureDone = true;
-    nativeFetch('api/ensure_trips.php?date=' + encodeURIComponent(date), { method: 'POST', cache: 'no-store' })
-      .then(function (r) { return r.json(); })
+    nativeFetch('api/ensure_trips.php?date=' + encodeURIComponent(date), {
+      method: 'POST',
+      cache: 'no-store'
+    })
+      .then(function (r) {
+        return r.json();
+      })
       .then(function (data) {
         if (data && data.ok && data.created > 0) {
           quietUntil = Date.now() + 5000;
@@ -124,7 +189,9 @@
       return;
     }
     nativeFetch('api/desk_poll.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        return r.json();
+      })
       .then(function (data) {
         if (!data || !data.ok || !data.version) return;
         if (lastVersion === null) {
@@ -144,6 +211,7 @@
   }
 
   function start() {
+    placeVehiclesByDate();
     ensureEmptyTrips();
     if (timer) clearInterval(timer);
     poll();
