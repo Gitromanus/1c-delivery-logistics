@@ -1,13 +1,16 @@
 <?php
-
+/**
+ * Приём заявок из 1С.
+ * При сохранении: геокодирование адреса + определение зоны (полигон или keywords).
+ */
 require dirname(__DIR__) . '/bootstrap.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
 $config = require (defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__)) . '/config.php';
-// api_key или ApiKey1s (как назвали в config)
 $apiKey = (string) ($config['api_key'] ?? $config['ApiKey1s'] ?? '');
-$yandexKey = (string) ($config['yandex_geocoder_key'] ?? ($config['yandex_maps_key'] ?? ''));
+$yandexKey = (string) ($config['yandex_geocoder_key'] ?? ($config['yandex_maps_key'] ?? $config['api_key_yandex'] ?? ''));
+// Часто в config лежит только JS-ключ — HTTP-геокодер его не принимает; тогда сработают Photon/Nominatim
 $dadataToken = (string) ($config['dadata_token'] ?? '');
 
 $given = $_SERVER['HTTP_X_API_KEY'] ?? ($_POST['api_key'] ?? '');
@@ -44,7 +47,6 @@ if (isset($data['orders']) && is_array($data['orders'])) {
 
 $pdo = Database::pdo();
 
-// lat/lon могут отсутствовать, если миграцию не накатывали — пишем без них
 $hasCoords = false;
 try {
     $cols = $pdo->query("SHOW COLUMNS FROM orders LIKE 'lat'")->fetch();
@@ -67,7 +69,7 @@ if ($hasCoords) {
            weight_kg = VALUES(weight_kg),
            amount = VALUES(amount),
            comment = VALUES(comment),
-           zone_id = VALUES(zone_id),
+           zone_id = COALESCE(VALUES(zone_id), zone_id),
            updated_at = CURRENT_TIMESTAMP"
     );
 } else {
@@ -82,13 +84,14 @@ if ($hasCoords) {
            weight_kg = VALUES(weight_kg),
            amount = VALUES(amount),
            comment = VALUES(comment),
-           zone_id = VALUES(zone_id),
+           zone_id = COALESCE(VALUES(zone_id), zone_id),
            updated_at = CURRENT_TIMESTAMP"
     );
 }
 
 $saved = 0;
 $errors = [];
+$details = [];
 
 foreach ($items as $i => $row) {
     if (!is_array($row) || empty($row['external_id']) || empty($row['address'])) {
@@ -100,28 +103,34 @@ foreach ($items as $i => $row) {
         $address = mb_substr($address, 0, 500);
     }
 
-    $lat = isset($row['lat']) ? (float) $row['lat'] : null;
-    $lon = isset($row['lon']) ? (float) $row['lon'] : null;
-    $zoneId = null;
+    $lat = isset($row['lat']) && $row['lat'] !== '' && $row['lat'] !== null ? (float) $row['lat'] : null;
+    $lon = isset($row['lon']) && $row['lon'] !== '' && $row['lon'] !== null ? (float) $row['lon'] : null;
+    $zoneId = isset($row['zone_id']) ? (int) $row['zone_id'] : null;
+    if ($zoneId !== null && $zoneId <= 0) {
+        $zoneId = null;
+    }
 
-    if ($hasCoords) {
-        if ($lat === null && $lon === null && class_exists('Geocoder')) {
-            $geo = Geocoder::geocode($address, $yandexKey, $dadataToken);
-            if ($geo) {
-                $lat = $geo['lat'];
-                $lon = $geo['lon'];
-            }
+    $geoProvider = null;
+    $geoError = null;
+
+    // 1) Геокод, если нет координат
+    if ($hasCoords && $lat === null && $lon === null) {
+        $meta = Geocoder::geocodeWithMeta($address, $yandexKey, $dadataToken);
+        if (!empty($meta['point'])) {
+            $lat = (float) $meta['point']['lat'];
+            $lon = (float) $meta['point']['lon'];
+            $geoProvider = $meta['provider'] ?? 'ok';
+        } else {
+            $geoError = $meta['error'] ?? 'geocode failed';
         }
-        if (class_exists('ZoneMatcher') && method_exists('ZoneMatcher', 'matchByCoords')) {
-            $zoneId = ZoneMatcher::matchByCoords($pdo, $lat, $lon);
-        }
-        if ($zoneId === null && class_exists('ZoneMatcher') && method_exists('ZoneMatcher', 'matchZoneId')) {
-            $zoneId = ZoneMatcher::matchZoneId($pdo, $address);
-        }
-    } else {
-        if (class_exists('ZoneMatcher') && method_exists('ZoneMatcher', 'matchZoneId')) {
-            $zoneId = ZoneMatcher::matchZoneId($pdo, $address);
-        }
+    }
+
+    // 2) Зона: сначала полигон по координатам, иначе keywords адреса
+    if ($zoneId === null && $lat !== null && $lon !== null) {
+        $zoneId = ZoneMatcher::matchByCoords($pdo, $lat, $lon);
+    }
+    if ($zoneId === null) {
+        $zoneId = ZoneMatcher::matchZoneId($pdo, $address);
     }
 
     try {
@@ -142,6 +151,14 @@ foreach ($items as $i => $row) {
         }
         $upsert->execute($params);
         $saved++;
+        $details[] = [
+            'external_id' => $params[':external_id'],
+            'lat' => $lat,
+            'lon' => $lon,
+            'zone_id' => $zoneId,
+            'geo_provider' => $geoProvider,
+            'geo_error' => $geoError,
+        ];
     } catch (Throwable $e) {
         $errors[] = "Item $i: " . $e->getMessage();
     }
@@ -151,4 +168,6 @@ echo json_encode([
     'ok' => empty($errors),
     'saved' => $saved,
     'errors' => $errors,
+    'details' => $details,
+    'has_coords_column' => $hasCoords,
 ], JSON_UNESCAPED_UNICODE);

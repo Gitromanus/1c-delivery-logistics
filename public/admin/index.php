@@ -42,10 +42,10 @@ if ($html2 !== null && $html2 !== $html) {
     $changed = true;
 }
 if (stripos($html, '</body>') !== false) {
-    $html = str_ireplace('</body>', "  <script src=\"../assets/js/admin-settings.js?v=7\"></script>\n</body>", $html);
+    $html = str_ireplace('</body>', "  <script src=\"../assets/js/admin-settings.js?v=8\"></script>\n</body>", $html);
     $changed = true;
 } else {
-    $html .= "\n<script src=\"../assets/js/admin-settings.js?v=7\"></script>\n";
+    $html .= "\n<script src=\"../assets/js/admin-settings.js?v=8\"></script>\n";
     $changed = true;
 }
 

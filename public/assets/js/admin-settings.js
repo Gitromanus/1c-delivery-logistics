@@ -1,5 +1,5 @@
 /**
- * Админка v7 — стиль меток внутри блока «Полигоны зон»
+ * Админка v8 — стиль меток только после входа (не на форме пароля).
  */
 (function () {
   var STYLE_KEY = 'logistics-marker-style';
@@ -9,6 +9,25 @@
     stretchy: 'Широкая с номером',
     dot: 'Точка'
   };
+
+  function isLoginPage() {
+    var pwd = document.querySelector('input[type="password"]');
+    if (!pwd) return false;
+    // Есть панели зон/машин/полигонов — уже вошли
+    var hasAdmin =
+      !!document.querySelector('section.panel h2') ||
+      !!document.querySelector('.panel-head');
+    if (hasAdmin) {
+      var texts = Array.prototype.map
+        .call(document.querySelectorAll('h2'), function (h) {
+          return (h.textContent || '').trim();
+        })
+        .join(' ');
+      if (/Зон|Машин|Привяз|Полигон/i.test(texts)) return false;
+    }
+    // Только форма входа
+    return true;
+  }
 
   function getStyle() {
     try {
@@ -86,11 +105,7 @@
     if (document.getElementById('adminMarkerStyle')) return;
 
     var poly = findPanelByTitle(/Полигон/i);
-    if (!poly) {
-      // запасной вариант — в .app
-      poly = document.querySelector('.app');
-      if (!poly) return;
-    }
+    if (!poly) return;
 
     var row = document.createElement('div');
     row.className = 'admin-marker-in-poly';
@@ -99,7 +114,6 @@
       '<select id="adminMarkerStyle"></select>' +
       '<span class="muted" style="font-size:0.8rem">для рабочего стола</span>';
 
-    // после заголовка h2
     var h2 = poly.querySelector('h2');
     if (h2 && h2.nextSibling) {
       poly.insertBefore(row, h2.nextSibling);
@@ -124,10 +138,14 @@
   }
 
   function boot() {
+    // Не трогаем экран входа
+    if (isLoginPage()) return;
+
     injectLayoutCss();
     wrapTopPanels();
     mountMarkerInPolygons();
     setTimeout(function () {
+      if (isLoginPage()) return;
       wrapTopPanels();
       if (!document.getElementById('adminMarkerStyle')) mountMarkerInPolygons();
     }, 400);

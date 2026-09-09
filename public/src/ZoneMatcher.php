@@ -1,14 +1,12 @@
 <?php
 
 /**
- * Определение зоны по координатам заявки (попадание точки в полигон зоны).
- * Полигоны рисуются в админке и хранятся в zone_polygons.polygon как [[lat,lon],...].
+ * Зона по координатам (полигон) или по ключевым словам адреса.
  */
 class ZoneMatcher
 {
     /**
-     * Возвращает id зоны, чей полигон содержит точку (lat, lon).
-     * Если точка попадает в несколько полигонов — берётся наименьший по площади.
+     * id зоны, чей полигон содержит точку. При нескольких — меньшая площадь.
      */
     public static function matchByCoords(PDO $pdo, ?float $lat, ?float $lon): ?int
     {
@@ -23,7 +21,7 @@ class ZoneMatcher
              WHERE z.is_active = 1"
         )->fetchAll();
 
-        $best = null; // [zone_id, area]
+        $best = null;
         foreach ($rows as $row) {
             $poly = json_decode((string) $row['polygon'], true);
             if (!is_array($poly) || count($poly) < 3) {
@@ -41,18 +39,59 @@ class ZoneMatcher
         return $best ? $best[0] : null;
     }
 
-    /** Попадание точки [lat, lon] в многоугольник [[lat,lon],...] (Ray casting). */
+    /**
+     * Зона по подстрокам адреса (zones.keywords через ;).
+     * Берётся зона с самым длинным совпавшим ключевым словом.
+     */
+    public static function matchZoneId(PDO $pdo, string $address): ?int
+    {
+        $address = trim($address);
+        if ($address === '') {
+            return null;
+        }
+        $addrLower = mb_strtolower($address);
+
+        try {
+            $rows = $pdo->query(
+                "SELECT id, keywords FROM zones WHERE is_active = 1 AND keywords IS NOT NULL AND keywords <> ''"
+            )->fetchAll();
+        } catch (Throwable $e) {
+            return null;
+        }
+
+        $bestId = null;
+        $bestLen = 0;
+        foreach ($rows as $row) {
+            $parts = preg_split('/[;|\n]+/u', (string) $row['keywords']);
+            if (!$parts) {
+                continue;
+            }
+            foreach ($parts as $kw) {
+                $kw = trim(mb_strtolower($kw));
+                if ($kw === '' || mb_strlen($kw) < 2) {
+                    continue;
+                }
+                if (mb_strpos($addrLower, $kw) !== false && mb_strlen($kw) > $bestLen) {
+                    $bestLen = mb_strlen($kw);
+                    $bestId = (int) $row['id'];
+                }
+            }
+        }
+
+        return $bestId;
+    }
+
     private static function pointInPolygon(float $lat, float $lon, array $poly): bool
     {
         $inside = false;
         $n = count($poly);
         for ($i = 0, $j = $n - 1; $i < $n; $j = $i++) {
-            $xi = (float) $poly[$i][1]; // lon
-            $yi = (float) $poly[$i][0]; // lat
+            $xi = (float) $poly[$i][1];
+            $yi = (float) $poly[$i][0];
             $xj = (float) $poly[$j][1];
             $yj = (float) $poly[$j][0];
             $intersect = (($yi > $lat) !== ($yj > $lat))
-                && ($lon < ($xj - $xi) * ($lat - $yi) / ($yj - $yi) + $xi);
+                && ($lon < ($xj - $xi) * ($lat - $yi) / (($yj - $yi) ?: 1e-12) + $xi);
             if ($intersect) {
                 $inside = !$inside;
             }
@@ -60,7 +99,6 @@ class ZoneMatcher
         return $inside;
     }
 
-    /** Площадь многоугольника (формула шнурков). */
     private static function polygonArea(array $poly): float
     {
         $area = 0.0;
