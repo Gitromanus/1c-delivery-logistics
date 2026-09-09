@@ -41,6 +41,9 @@ if (is_file($srcDir . '/EnsureTrips.php')) {
 if (is_file($srcDir . '/OrderAssign.php')) {
     require_once $srcDir . '/OrderAssign.php';
 }
+if (is_file($srcDir . '/DeskVehicles.php')) {
+    require_once $srcDir . '/DeskVehicles.php';
+}
 
 if (!defined('APP_ROOT')) {
     define('APP_ROOT', dirname($configPath));
