@@ -1,9 +1,8 @@
 <?php
 /**
- * Операции с машиной и зоной (для drag & drop машин на рабочем столе).
- * POST (JSON):
- *   { action: 'move', vehicle_id, zone_id, date? } — перенести машину в зону
- *   и обновить zone_id у рейсов этой машины на дату.
+ * Перенос машины в зону на выбранную дату.
+ * - Рейсы этой машины на DATE → новая зона (история других дней не трогаем).
+ * - vehicle_zones обновляем только если DATE = сегодня (шаблон «по умолчанию»).
  */
 require dirname(__DIR__) . '/bootstrap.php';
 
@@ -58,18 +57,32 @@ if (!$zone) {
 if ($action === 'move') {
     $pdo->beginTransaction();
     try {
-        $pdo->prepare('DELETE FROM vehicle_zones WHERE vehicle_id = ?')->execute([$vehicleId]);
-        $pdo->prepare(
-            'INSERT IGNORE INTO vehicle_zones (vehicle_id, zone_id, is_primary) VALUES (?, ?, 1)'
-        )->execute([$vehicleId, $zoneId]);
+        // Глобальную привязку меняем только «на сегодня»
+        if ($date === date('Y-m-d')) {
+            $pdo->prepare('DELETE FROM vehicle_zones WHERE vehicle_id = ?')->execute([$vehicleId]);
+            $pdo->prepare(
+                'INSERT IGNORE INTO vehicle_zones (vehicle_id, zone_id, is_primary) VALUES (?, ?, 1)'
+            )->execute([$vehicleId, $zoneId]);
+        }
 
-        // Рейсы этой машины на дату — в новую зону
-        $updTrips = $pdo->prepare(
-            "UPDATE trips SET zone_id = ?
-             WHERE vehicle_id = ? AND trip_date = ? AND status <> 'cancelled'"
+        // Есть рейс на дату — сдвинуть зону; нет — создать пустой draft
+        $exist = $pdo->prepare(
+            "SELECT id FROM trips WHERE vehicle_id = ? AND trip_date = ? AND status <> 'cancelled' LIMIT 1"
         );
-        $updTrips->execute([$zoneId, $vehicleId, $date]);
-        $tripsUpdated = $updTrips->rowCount();
+        $exist->execute([$vehicleId, $date]);
+        $tripId = $exist->fetchColumn();
+
+        if ($tripId) {
+            $pdo->prepare(
+                "UPDATE trips SET zone_id = ? WHERE vehicle_id = ? AND trip_date = ? AND status <> 'cancelled'"
+            )->execute([$zoneId, $vehicleId, $date]);
+            $tripsUpdated = 1;
+        } else {
+            $pdo->prepare(
+                "INSERT INTO trips (trip_date, vehicle_id, zone_id, status) VALUES (?, ?, ?, 'draft')"
+            )->execute([$date, $vehicleId, $zoneId]);
+            $tripsUpdated = 1;
+        }
 
         $pdo->commit();
     } catch (Throwable $e) {
@@ -87,6 +100,7 @@ if ($action === 'move') {
         'zone_name' => $zone['name'],
         'date' => $date,
         'trips_updated' => $tripsUpdated,
+        'defaults_updated' => $date === date('Y-m-d'),
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }

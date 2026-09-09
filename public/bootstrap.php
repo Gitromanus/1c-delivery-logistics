@@ -38,6 +38,9 @@ require_once $srcDir . '/Geocoder.php';
 if (is_file($srcDir . '/EnsureTrips.php')) {
     require_once $srcDir . '/EnsureTrips.php';
 }
+if (is_file($srcDir . '/OrderAssign.php')) {
+    require_once $srcDir . '/OrderAssign.php';
+}
 
 if (!defined('APP_ROOT')) {
     define('APP_ROOT', dirname($configPath));
