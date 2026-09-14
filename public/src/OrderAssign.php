@@ -1,8 +1,7 @@
 <?php
 
 /**
- * Постановка заявки в рейс: зона → машина → trip на дату.
- * В ответе — загрузка, гос.номер, зона, флаг перегруза.
+ * Постановка / снятие заявки с рейса.
  */
 class OrderAssign
 {
@@ -54,6 +53,30 @@ class OrderAssign
         return array_merge($result, self::tripLoad($pdo, $tripId));
     }
 
+    /**
+     * Снять с рейса → нераспределённые (status = new).
+     */
+    public static function unassign(PDO $pdo, int $orderId): array
+    {
+        $result = self::emptyResult(null);
+        if ($orderId <= 0) {
+            $result['message'] = 'order_id required';
+            return $result;
+        }
+
+        $pdo->prepare('DELETE FROM trip_items WHERE order_id = ?')->execute([$orderId]);
+        $pdo->prepare("UPDATE orders SET status = 'new' WHERE id = ?")->execute([$orderId]);
+
+        $st = $pdo->prepare('SELECT zone_id FROM orders WHERE id = ?');
+        $st->execute([$orderId]);
+        $zid = $st->fetchColumn();
+        $result['zone_id'] = $zid !== false && $zid !== null ? (int) $zid : null;
+        $result['message'] = 'Заявка снята с рейса (нераспределённые)';
+        $result['unassigned'] = true;
+
+        return $result;
+    }
+
     private static function emptyResult(?int $zoneId): array
     {
         return [
@@ -70,6 +93,7 @@ class OrderAssign
             'overload_kg' => 0.0,
             'load_percent' => 0,
             'message' => '',
+            'unassigned' => false,
         ];
     }
 
@@ -102,6 +126,7 @@ class OrderAssign
                 'overload_kg' => 0.0,
                 'load_percent' => 0,
                 'message' => 'Рейс не найден',
+                'unassigned' => false,
             ];
         }
 
@@ -158,6 +183,7 @@ class OrderAssign
             'overload_kg' => $overloadKg,
             'load_percent' => $pct,
             'message' => $msg,
+            'unassigned' => false,
         ];
     }
 

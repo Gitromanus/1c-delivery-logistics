@@ -1,6 +1,10 @@
 <?php
 /**
- * Приём заявок из 1С. details: message, plate, zone, overload.
+ * Приём заявок из 1С.
+ *
+ * Поля:
+ *   assign_trip: true|false  — ставить в рейс (по умолчанию true)
+ *   action: "unassign"       — снять с рейса → нераспределённые
  */
 require dirname(__DIR__) . '/bootstrap.php';
 
@@ -56,7 +60,7 @@ try {
 if ($hasCoords) {
     $upsert = $pdo->prepare(
         "INSERT INTO orders (external_id, number, doc_date, partner, address, lat, lon, weight_kg, amount, comment, zone_id, status)
-         VALUES (:external_id, :number, :doc_date, :partner, :address, :lat, :lon, :weight_kg, :amount, :comment, :zone_id, 'new')
+         VALUES (:external_id, :number, :doc_date, :partner, :address, :lat, :lon, :weight_kg, :amount, :comment, :zone_id, :status)
          ON DUPLICATE KEY UPDATE
            number = VALUES(number),
            doc_date = VALUES(doc_date),
@@ -68,12 +72,13 @@ if ($hasCoords) {
            amount = VALUES(amount),
            comment = VALUES(comment),
            zone_id = COALESCE(VALUES(zone_id), zone_id),
+           status = VALUES(status),
            updated_at = CURRENT_TIMESTAMP"
     );
 } else {
     $upsert = $pdo->prepare(
         "INSERT INTO orders (external_id, number, doc_date, partner, address, weight_kg, amount, comment, zone_id, status)
-         VALUES (:external_id, :number, :doc_date, :partner, :address, :weight_kg, :amount, :comment, :zone_id, 'new')
+         VALUES (:external_id, :number, :doc_date, :partner, :address, :weight_kg, :amount, :comment, :zone_id, :status)
          ON DUPLICATE KEY UPDATE
            number = VALUES(number),
            doc_date = VALUES(doc_date),
@@ -83,6 +88,7 @@ if ($hasCoords) {
            amount = VALUES(amount),
            comment = VALUES(comment),
            zone_id = COALESCE(VALUES(zone_id), zone_id),
+           status = VALUES(status),
            updated_at = CURRENT_TIMESTAMP"
     );
 }
@@ -93,11 +99,30 @@ $details = [];
 $anyOverload = false;
 
 foreach ($items as $i => $row) {
-    if (!is_array($row) || empty($row['external_id']) || empty($row['address'])) {
-        $errors[] = "Item $i: external_id and address required";
+    if (!is_array($row) || empty($row['external_id'])) {
+        $errors[] = "Item $i: external_id required";
         continue;
     }
-    $address = trim((string) $row['address']);
+
+    $action = strtolower(trim((string) ($row['action'] ?? $data['action'] ?? '')));
+    $assignTrip = true;
+    if (array_key_exists('assign_trip', $row)) {
+        $assignTrip = filter_var($row['assign_trip'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if ($assignTrip === null) {
+            $assignTrip = !in_array($row['assign_trip'], [0, '0', 'false', 'False', false], true);
+        }
+    } elseif (array_key_exists('assign_trip', $data)) {
+        $assignTrip = filter_var($data['assign_trip'], FILTER_VALIDATE_BOOLEAN);
+    }
+    if ($action === 'unassign') {
+        $assignTrip = false;
+    }
+
+    $address = trim((string) ($row['address'] ?? ''));
+    if ($address === '' && $action !== 'unassign') {
+        $errors[] = "Item $i: address required";
+        continue;
+    }
     if (mb_strlen($address) > 500) {
         $address = mb_substr($address, 0, 500);
     }
@@ -114,7 +139,12 @@ foreach ($items as $i => $row) {
     $docDate = !empty($row['doc_date']) ? (string) $row['doc_date'] : date('Y-m-d');
     $weightKg = isset($row['weight_kg']) ? (float) $row['weight_kg'] : 0;
 
-    if ($hasCoords && $lat === null && $lon === null) {
+    // unassign по external_id без полного адреса
+    if ($action === 'unassign' || !$assignTrip) {
+        // при обычном upsert без рейса — геокод/зона всё же полезны
+    }
+
+    if ($hasCoords && $lat === null && $lon === null && $address !== '') {
         $meta = Geocoder::geocodeWithMeta($address, $yandexKey, $dadataToken);
         if (!empty($meta['point'])) {
             $lat = (float) $meta['point']['lat'];
@@ -128,9 +158,11 @@ foreach ($items as $i => $row) {
     if ($zoneId === null && $lat !== null && $lon !== null) {
         $zoneId = ZoneMatcher::matchByCoords($pdo, $lat, $lon);
     }
-    if ($zoneId === null) {
+    if ($zoneId === null && $address !== '') {
         $zoneId = ZoneMatcher::matchZoneId($pdo, $address);
     }
+
+    $status = $assignTrip ? 'new' : 'new'; // до assign; unassign тоже new
 
     try {
         $params = [
@@ -138,16 +170,19 @@ foreach ($items as $i => $row) {
             ':number' => isset($row['number']) ? mb_substr((string) $row['number'], 0, 50) : null,
             ':doc_date' => $docDate,
             ':partner' => isset($row['partner']) ? mb_substr((string) $row['partner'], 0, 255) : null,
-            ':address' => $address,
+            ':address' => $address !== '' ? $address : '—',
             ':weight_kg' => $weightKg,
             ':amount' => isset($row['amount']) ? (float) $row['amount'] : null,
             ':comment' => isset($row['comment']) ? mb_substr((string) $row['comment'], 0, 500) : null,
             ':zone_id' => $zoneId,
+            ':status' => 'new',
         ];
         if ($hasCoords) {
             $params[':lat'] = $lat;
             $params[':lon'] = $lon;
         }
+
+        // Только unassign по известному external_id — без обязательного upsert адреса? делаем upsert всегда
         $upsert->execute($params);
         $saved++;
 
@@ -169,10 +204,30 @@ foreach ($items as $i => $row) {
             'overload_kg' => 0,
             'load_percent' => 0,
             'message' => '',
+            'unassigned' => true,
         ];
-        if ($orderId > 0 && $zoneId && class_exists('OrderAssign')) {
-            $assign = OrderAssign::toTrip($pdo, $orderId, $zoneId, $docDate, $weightKg);
+
+        if ($orderId > 0 && class_exists('OrderAssign')) {
+            if ($action === 'unassign' || !$assignTrip) {
+                $assign = OrderAssign::unassign($pdo, $orderId);
+                // зона могла определиться выше — сохраним
+                if ($zoneId) {
+                    $pdo->prepare('UPDATE orders SET zone_id = COALESCE(zone_id, ?) WHERE id = ?')
+                        ->execute([$zoneId, $orderId]);
+                    $assign['zone_id'] = $zoneId;
+                }
+                if ($action === 'unassign') {
+                    $assign['message'] = 'Снята с рейса → нераспределённые';
+                } else {
+                    $assign['message'] = 'В нераспределённых (без рейса)';
+                }
+            } elseif ($zoneId) {
+                $assign = OrderAssign::toTrip($pdo, $orderId, $zoneId, $docDate, $weightKg);
+            } else {
+                $assign['message'] = 'Сохранена без зоны и рейса';
+            }
         }
+
         if (!empty($assign['overload'])) {
             $anyOverload = true;
         }
@@ -195,6 +250,7 @@ foreach ($items as $i => $row) {
             'overload_kg' => $assign['overload_kg'] ?? 0,
             'load_percent' => $assign['load_percent'] ?? 0,
             'message' => $assign['message'] ?? '',
+            'unassigned' => !empty($assign['unassigned']) || !$assignTrip || $action === 'unassign',
             'geo_provider' => $geoProvider,
             'geo_error' => $geoError,
         ];
