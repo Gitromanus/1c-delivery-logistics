@@ -3,7 +3,7 @@
 /**
  * Постановка / снятие заявки с рейса.
  * Заявка зоны X ставится ТОЛЬКО на машину/рейс зоны X.
- * Нет машины в зоне → остаётся в нераспределённых.
+ * Нет машины в зоне → остаётся в нераспределённых (с названием зоны).
  */
 class OrderAssign
 {
@@ -19,21 +19,23 @@ class OrderAssign
             $docDate = date('Y-m-d');
         }
 
+        $zoneName = self::zoneName($pdo, $zoneId);
+        $result['zone_name'] = $zoneName;
+
         $chk = $pdo->prepare('SELECT trip_id FROM trip_items WHERE order_id = ? LIMIT 1');
         $chk->execute([$orderId]);
         $existingTrip = $chk->fetchColumn();
         if ($existingTrip) {
-            // Уже в рейсе — не перекидываем в другой
             $result['trip_id'] = (int) $existingTrip;
             return array_merge($result, self::tripLoad($pdo, (int) $existingTrip));
         }
 
         $vehicleId = self::pickVehicle($pdo, $zoneId, $docDate, $weightKg);
         if ($vehicleId === null) {
-            // Явно без рейса
             $pdo->prepare("UPDATE orders SET status = 'new', zone_id = COALESCE(zone_id, ?) WHERE id = ?")
                 ->execute([$zoneId, $orderId]);
-            $result['message'] = 'Нет машины в зоне — заявка в нераспределённых';
+            $zn = $zoneName !== '' ? '«' . $zoneName . '»' : 'зоны';
+            $result['message'] = 'Нет машины в зоне ' . $zn . ' — заявка в нераспределённых';
             $result['unassigned'] = true;
             return $result;
         }
@@ -43,7 +45,8 @@ class OrderAssign
         if ($tripId === null) {
             $pdo->prepare("UPDATE orders SET status = 'new', zone_id = COALESCE(zone_id, ?) WHERE id = ?")
                 ->execute([$zoneId, $orderId]);
-            $result['message'] = 'Машина занята в другой зоне — заявка в нераспределённых';
+            $zn = $zoneName !== '' ? '«' . $zoneName . '»' : 'зоны';
+            $result['message'] = 'Машина занята в другой зоне (нужна ' . $zn . ') — заявка в нераспределённых';
             $result['unassigned'] = true;
             return $result;
         }
@@ -62,6 +65,14 @@ class OrderAssign
             ->execute([$zoneId, $orderId]);
 
         return array_merge($result, self::tripLoad($pdo, $tripId));
+    }
+
+    private static function zoneName(PDO $pdo, int $zoneId): string
+    {
+        $st = $pdo->prepare('SELECT name FROM zones WHERE id = ? LIMIT 1');
+        $st->execute([$zoneId]);
+        $n = $st->fetchColumn();
+        return $n ? trim((string) $n) : '';
     }
 
     public static function unassign(PDO $pdo, int $orderId): array
@@ -87,13 +98,17 @@ class OrderAssign
         if ($row) {
             $result['zone_id'] = $row['zone_id'] !== null ? (int) $row['zone_id'] : null;
             $result['external_id'] = $row['external_id'];
+            if ($result['zone_id']) {
+                $result['zone_name'] = self::zoneName($pdo, $result['zone_id']);
+            }
         }
 
         $result['order_id'] = $orderId;
         $result['deleted_links'] = $deleted;
+        $zn = !empty($result['zone_name']) ? ' (зона «' . $result['zone_name'] . '»)' : '';
         $result['message'] = $deleted > 0
-            ? 'Снята с рейса → нераспределённые'
-            : 'Уже была вне рейса → нераспределённые';
+            ? 'Снята с рейса → нераспределённые' . $zn
+            : 'Уже была вне рейса → нераспределённые' . $zn;
 
         return $result;
     }
@@ -234,13 +249,8 @@ class OrderAssign
         ];
     }
 
-    /**
-     * Только машины этой зоны (рейс с zone_id или привязка vehicle_zones).
-     * Чужую зону / «любую машину» — никогда.
-     */
     private static function pickVehicle(PDO $pdo, int $zoneId, string $docDate, float $weightKg): ?int
     {
-        // 1) Рейсы уже в ЭТОЙ зоне на дату
         $sql = "SELECT t.vehicle_id, v.capacity_kg,
                        COALESCE((SELECT SUM(o.weight_kg) FROM trip_items ti
                                  JOIN orders o ON o.id = ti.order_id WHERE ti.trip_id = t.id), 0) AS loaded
@@ -259,12 +269,10 @@ class OrderAssign
                 return (int) $r['vehicle_id'];
             }
         }
-        // Перегруз в зоне — всё равно на наименее загруженную этой зоны
         if ($rows) {
             return (int) $rows[0]['vehicle_id'];
         }
 
-        // 2) Привязка vehicle_zones → зона, и машина не занята рейсом в ДРУГОЙ зоне
         $st = $pdo->prepare(
             "SELECT vz.vehicle_id
              FROM vehicle_zones vz
@@ -288,16 +296,11 @@ class OrderAssign
             if ($tz === false || $tz === null || (int) $tz === $zoneId) {
                 return $vid;
             }
-            // рейс в другой зоне — эту машину не берём
         }
 
         return null;
     }
 
-    /**
-     * Рейс только с совпадающей zone_id (или без зоны — тогда ставим нужную).
-     * Рейс машины в другой зоне — не используем.
-     */
     private static function ensureTrip(PDO $pdo, int $vehicleId, int $zoneId, string $docDate): ?int
     {
         $st = $pdo->prepare(
@@ -318,7 +321,6 @@ class OrderAssign
             if ($tz === $zoneId) {
                 return $tid;
             }
-            // Машина уже в другом рейсе/зоне на этот день
             return null;
         }
 
