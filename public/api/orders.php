@@ -1,7 +1,7 @@
 <?php
 /**
  * Приём заявок из 1С.
- * Геокод + зона + автопостановка в рейс на дату документа.
+ * Геокод + зона + рейс. В details — загрузка и overload для сообщения в 1С.
  */
 require dirname(__DIR__) . '/bootstrap.php';
 
@@ -91,6 +91,7 @@ if ($hasCoords) {
 $saved = 0;
 $errors = [];
 $details = [];
+$anyOverload = false;
 
 foreach ($items as $i => $row) {
     if (!is_array($row) || empty($row['external_id']) || empty($row['address'])) {
@@ -155,9 +156,24 @@ foreach ($items as $i => $row) {
         $idStmt->execute([$params[':external_id']]);
         $orderId = (int) $idStmt->fetchColumn();
 
-        $assign = ['trip_id' => null, 'vehicle_id' => null, 'zone_id' => $zoneId];
+        $assign = [
+            'trip_id' => null,
+            'vehicle_id' => null,
+            'zone_id' => $zoneId,
+            'vehicle_name' => null,
+            'capacity_kg' => 0,
+            'loaded_kg' => 0,
+            'free_kg' => 0,
+            'overload' => false,
+            'overload_kg' => 0,
+            'load_percent' => 0,
+            'message' => '',
+        ];
         if ($orderId > 0 && $zoneId && class_exists('OrderAssign')) {
             $assign = OrderAssign::toTrip($pdo, $orderId, $zoneId, $docDate, $weightKg);
+        }
+        if (!empty($assign['overload'])) {
+            $anyOverload = true;
         }
 
         $details[] = [
@@ -168,6 +184,14 @@ foreach ($items as $i => $row) {
             'zone_id' => $zoneId,
             'trip_id' => $assign['trip_id'] ?? null,
             'vehicle_id' => $assign['vehicle_id'] ?? null,
+            'vehicle_name' => $assign['vehicle_name'] ?? null,
+            'capacity_kg' => $assign['capacity_kg'] ?? 0,
+            'loaded_kg' => $assign['loaded_kg'] ?? 0,
+            'free_kg' => $assign['free_kg'] ?? 0,
+            'overload' => !empty($assign['overload']),
+            'overload_kg' => $assign['overload_kg'] ?? 0,
+            'load_percent' => $assign['load_percent'] ?? 0,
+            'message' => $assign['message'] ?? '',
             'geo_provider' => $geoProvider,
             'geo_error' => $geoError,
         ];
@@ -180,6 +204,7 @@ echo json_encode([
     'ok' => empty($errors),
     'saved' => $saved,
     'errors' => $errors,
+    'overload' => $anyOverload,
     'details' => $details,
     'has_coords_column' => $hasCoords,
 ], JSON_UNESCAPED_UNICODE);
