@@ -1,4 +1,4 @@
-/** live.js v11 — poll, theme, vehicles by date, zone load from trips */
+/** live.js v12 — zone yellow bar when load without vehicles */
 (function () {
   function loadScript(id, src) {
     if (document.getElementById(id)) return;
@@ -21,9 +21,7 @@
   }
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
-    try {
-      localStorage.setItem(THEME_KEY, theme);
-    } catch (e) {}
+    try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
     var btn = document.getElementById('themeToggle');
     if (btn) {
       btn.textContent = theme === 'light' ? '🌙' : '☀️';
@@ -72,18 +70,13 @@
     return Math.round(Number(n) || 0).toLocaleString('ru-RU');
   }
 
-  /** Загрузка зоны = рейсы зоны + нераспределённые */
   function updateZoneStats() {
     nativeFetch('api/desk_zone_stats.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
-      .then(function (r) {
-        return r.json();
-      })
+      .then(function (r) { return r.json(); })
       .then(function (data) {
         if (!data || !data.ok || !data.stats) return;
         var map = {};
-        data.stats.forEach(function (s) {
-          map[String(s.zone_id)] = s;
-        });
+        data.stats.forEach(function (s) { map[String(s.zone_id)] = s; });
 
         document.querySelectorAll('.zone-card[data-zone-drop]').forEach(function (card) {
           var zid = card.getAttribute('data-zone-drop');
@@ -103,25 +96,28 @@
           card.querySelectorAll('.veh-chip[data-cap]').forEach(function (ch) {
             totCap += parseFloat(ch.getAttribute('data-cap')) || 0;
           });
+          var nVeh = card.querySelectorAll('.veh-chip[data-vehicle-id]').length;
+          var noVeh = nVeh === 0 && w > 0.01;
 
           var bar = card.querySelector('.bar');
           if (bar) {
-            var pct = totCap > 0 ? Math.min(100, Math.round((w / totCap) * 100)) : 0;
-            bar.classList.toggle('over', w > totCap + 0.01);
+            bar.classList.remove('over', 'no-vehicle');
+            var pct = 0;
+            if (noVeh) {
+              pct = 100;
+              bar.classList.add('no-vehicle');
+            } else if (totCap > 0) {
+              pct = Math.min(100, Math.round((w / totCap) * 100));
+              if (w > totCap + 0.01) bar.classList.add('over');
+            }
             var i = bar.querySelector('i');
             if (i) i.style.width = pct + '%';
           }
 
           var cap = card.querySelector('.zone-cap');
           if (cap) {
-            var nVeh = card.querySelectorAll('.veh-chip[data-vehicle-id]').length;
             cap.textContent =
-              'Загружено: ' +
-              fmtKg(w) +
-              ' / ' +
-              fmtKg(totCap) +
-              ' кг · машин: ' +
-              nVeh;
+              'Загружено: ' + fmtKg(w) + ' / ' + fmtKg(totCap) + ' кг · машин: ' + nVeh;
             cap.removeAttribute('data-compact');
             card.removeAttribute('data-zone-compact');
           }
@@ -131,6 +127,9 @@
             if (cnt === 0) {
               badge.textContent = 'Пусто';
               badge.className = 'badge badge-ok badge-corner';
+            } else if (noVeh) {
+              badge.textContent = 'Нет машин';
+              badge.className = 'badge badge-warn badge-corner';
             } else if (totCap > 0 && w > totCap + 0.01) {
               badge.textContent = 'Перегруз';
               badge.className = 'badge badge-warn badge-corner';
@@ -146,27 +145,20 @@
 
   function placeVehiclesByDate() {
     nativeFetch('api/desk_vehicles.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
-      .then(function (r) {
-        return r.json();
-      })
+      .then(function (r) { return r.json(); })
       .then(function (data) {
         if (!data || !data.ok || !data.vehicles) return;
-
         var chips = {};
         document.querySelectorAll('.veh-chip[data-vehicle-id]').forEach(function (ch) {
           chips[ch.getAttribute('data-vehicle-id')] = ch;
         });
-
         document.querySelectorAll('.zone-vehicles').forEach(function (box) {
           box.innerHTML = '';
         });
-
         data.vehicles.forEach(function (v) {
           var zid = String(v.zone_id);
           var vid = String(v.vehicle_id);
-          var box = document.querySelector(
-            '.zone-card[data-zone-drop="' + zid + '"] .zone-vehicles'
-          );
+          var box = document.querySelector('.zone-card[data-zone-drop="' + zid + '"] .zone-vehicles');
           if (!box) return;
           var ch = chips[vid];
           if (!ch) {
@@ -183,7 +175,6 @@
           ch.setAttribute('data-zone-id', zid);
           box.appendChild(ch);
         });
-
         document.querySelectorAll('.zone-vehicles').forEach(function (box) {
           if (!box.children.length) {
             var empty = document.createElement('span');
@@ -192,20 +183,15 @@
             box.appendChild(empty);
           }
         });
-
         updateZoneStats();
       })
-      .catch(function () {
-        updateZoneStats();
-      });
+      .catch(function () { updateZoneStats(); });
   }
 
   window.deskAckLocalChange = function () {
     quietUntil = Date.now() + 30000;
     nativeFetch('api/desk_poll.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
-      .then(function (r) {
-        return r.json();
-      })
+      .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data && data.ok && data.version) lastVersion = data.version;
       })
@@ -221,21 +207,13 @@
           body.date = date;
           init = Object.assign({}, init, { body: JSON.stringify(body) });
           return nativeFetch(input, init).then(function (res) {
-            return res
-              .clone()
-              .json()
-              .then(function (data) {
-                if (data && data.ok) {
-                  quietUntil = Date.now() + 15000;
-                  setTimeout(function () {
-                    location.reload();
-                  }, 50);
-                }
-                return res;
-              })
-              .catch(function () {
-                return res;
-              });
+            return res.clone().json().then(function (data) {
+              if (data && data.ok) {
+                quietUntil = Date.now() + 15000;
+                setTimeout(function () { location.reload(); }, 50);
+              }
+              return res;
+            }).catch(function () { return res; });
           });
         }
       } catch (e) {}
@@ -246,13 +224,8 @@
   function ensureEmptyTrips() {
     if (ensureDone) return;
     ensureDone = true;
-    nativeFetch('api/ensure_trips.php?date=' + encodeURIComponent(date), {
-      method: 'POST',
-      cache: 'no-store'
-    })
-      .then(function (r) {
-        return r.json();
-      })
+    nativeFetch('api/ensure_trips.php?date=' + encodeURIComponent(date), { method: 'POST', cache: 'no-store' })
+      .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data && data.ok && data.created > 0) {
           quietUntil = Date.now() + 5000;
@@ -268,25 +241,14 @@
       wasDragging = false;
       if (window.deskAckLocalChange) window.deskAckLocalChange();
     }
-    if (isDragging()) {
-      wasDragging = true;
-      return;
-    }
+    if (isDragging()) { wasDragging = true; return; }
     nativeFetch('api/desk_poll.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
-      .then(function (r) {
-        return r.json();
-      })
+      .then(function (r) { return r.json(); })
       .then(function (data) {
         if (!data || !data.ok || !data.version) return;
-        if (lastVersion === null) {
-          lastVersion = data.version;
-          return;
-        }
+        if (lastVersion === null) { lastVersion = data.version; return; }
         if (data.version === lastVersion) return;
-        if (Date.now() < quietUntil) {
-          lastVersion = data.version;
-          return;
-        }
+        if (Date.now() < quietUntil) { lastVersion = data.version; return; }
         lastVersion = data.version;
         document.title = '● Логистика — новые заявки';
         location.reload();
