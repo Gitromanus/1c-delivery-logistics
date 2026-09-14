@@ -2,25 +2,10 @@
 
 /**
  * Постановка заявки в рейс: зона → машина → trip на дату.
- * В ответе — загрузка рейса и флаг перегруза.
+ * В ответе — загрузка, гос.номер, зона, флаг перегруза.
  */
 class OrderAssign
 {
-    /**
-     * @return array{
-     *   trip_id: ?int,
-     *   vehicle_id: ?int,
-     *   zone_id: ?int,
-     *   vehicle_name: ?string,
-     *   capacity_kg: float,
-     *   loaded_kg: float,
-     *   free_kg: float,
-     *   overload: bool,
-     *   overload_kg: float,
-     *   load_percent: int,
-     *   message: string
-     * }
-     */
     public static function toTrip(PDO $pdo, int $orderId, ?int $zoneId, string $docDate, float $weightKg = 0): array
     {
         $result = self::emptyResult($zoneId);
@@ -32,7 +17,6 @@ class OrderAssign
             $docDate = date('Y-m-d');
         }
 
-        // Уже в рейсе?
         $chk = $pdo->prepare('SELECT trip_id FROM trip_items WHERE order_id = ? LIMIT 1');
         $chk->execute([$orderId]);
         $existingTrip = $chk->fetchColumn();
@@ -67,8 +51,7 @@ class OrderAssign
         $pdo->prepare("UPDATE orders SET status = 'assigned', zone_id = COALESCE(zone_id, ?) WHERE id = ?")
             ->execute([$zoneId, $orderId]);
 
-        $load = self::tripLoad($pdo, $tripId);
-        return array_merge($result, $load);
+        return array_merge($result, self::tripLoad($pdo, $tripId));
     }
 
     private static function emptyResult(?int $zoneId): array
@@ -77,7 +60,9 @@ class OrderAssign
             'trip_id' => null,
             'vehicle_id' => null,
             'zone_id' => $zoneId,
+            'zone_name' => null,
             'vehicle_name' => null,
+            'vehicle_plate' => null,
             'capacity_kg' => 0.0,
             'loaded_kg' => 0.0,
             'free_kg' => 0.0,
@@ -88,15 +73,17 @@ class OrderAssign
         ];
     }
 
-    /** Загрузка рейса после постановки заявки. */
     public static function tripLoad(PDO $pdo, int $tripId): array
     {
         $st = $pdo->prepare(
-            "SELECT t.vehicle_id, v.name AS vehicle_name, v.capacity_kg,
+            "SELECT t.vehicle_id, t.zone_id,
+                    v.name AS vehicle_name, v.plate AS vehicle_plate, v.capacity_kg,
+                    z.name AS zone_name,
                     COALESCE((SELECT SUM(o.weight_kg) FROM trip_items ti
                               JOIN orders o ON o.id = ti.order_id WHERE ti.trip_id = t.id), 0) AS loaded_kg
              FROM trips t
              JOIN vehicles v ON v.id = t.vehicle_id
+             LEFT JOIN zones z ON z.id = t.zone_id
              WHERE t.id = ?"
         );
         $st->execute([$tripId]);
@@ -104,7 +91,10 @@ class OrderAssign
         if (!$row) {
             return [
                 'vehicle_id' => null,
+                'zone_id' => null,
+                'zone_name' => null,
                 'vehicle_name' => null,
+                'vehicle_plate' => null,
                 'capacity_kg' => 0.0,
                 'loaded_kg' => 0.0,
                 'free_kg' => 0.0,
@@ -122,10 +112,21 @@ class OrderAssign
         $overloadKg = $overload ? round($loaded - $cap, 2) : 0.0;
         $pct = $cap > 0 ? (int) min(999, round($loaded / $cap * 100)) : 0;
 
+        $name = trim((string) $row['vehicle_name']);
+        $plate = trim((string) ($row['vehicle_plate'] ?? ''));
+        $zoneName = trim((string) ($row['zone_name'] ?? ''));
+
+        $vehLabel = $name;
+        if ($plate !== '') {
+            $vehLabel .= ' (' . $plate . ')';
+        }
+        $zonePart = $zoneName !== '' ? ' · зона «' . $zoneName . '»' : '';
+
         if ($overload) {
             $msg = sprintf(
-                'ПЕРЕГРУЗ: %s — загружено %.0f из %.0f кг (+%.0f кг, %d%%)',
-                $row['vehicle_name'],
+                'ПЕРЕГРУЗ: %s%s — загружено %.0f из %.0f кг (+%.0f кг, %d%%)',
+                $vehLabel,
+                $zonePart,
                 $loaded,
                 $cap,
                 $overloadKg,
@@ -133,8 +134,9 @@ class OrderAssign
             );
         } else {
             $msg = sprintf(
-                '%s — загружено %.0f из %.0f кг (свободно %.0f кг, %d%%)',
-                $row['vehicle_name'],
+                '%s%s — загружено %.0f из %.0f кг (свободно %.0f кг, %d%%)',
+                $vehLabel,
+                $zonePart,
                 $loaded,
                 $cap,
                 max(0, $free),
@@ -145,7 +147,10 @@ class OrderAssign
         return [
             'trip_id' => $tripId,
             'vehicle_id' => (int) $row['vehicle_id'],
-            'vehicle_name' => (string) $row['vehicle_name'],
+            'zone_id' => $row['zone_id'] !== null ? (int) $row['zone_id'] : null,
+            'zone_name' => $zoneName !== '' ? $zoneName : null,
+            'vehicle_name' => $name,
+            'vehicle_plate' => $plate !== '' ? $plate : null,
             'capacity_kg' => $cap,
             'loaded_kg' => $loaded,
             'free_kg' => round($free, 2),

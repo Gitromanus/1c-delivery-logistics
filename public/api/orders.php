@@ -1,7 +1,6 @@
 <?php
 /**
- * Приём заявок из 1С.
- * Геокод + зона + рейс. В details — загрузка и overload для сообщения в 1С.
+ * Приём заявок из 1С. details: message, plate, zone, overload.
  */
 require dirname(__DIR__) . '/bootstrap.php';
 
@@ -160,7 +159,9 @@ foreach ($items as $i => $row) {
             'trip_id' => null,
             'vehicle_id' => null,
             'zone_id' => $zoneId,
+            'zone_name' => null,
             'vehicle_name' => null,
+            'vehicle_plate' => null,
             'capacity_kg' => 0,
             'loaded_kg' => 0,
             'free_kg' => 0,
@@ -181,10 +182,12 @@ foreach ($items as $i => $row) {
             'order_id' => $orderId,
             'lat' => $lat,
             'lon' => $lon,
-            'zone_id' => $zoneId,
+            'zone_id' => $assign['zone_id'] ?? $zoneId,
+            'zone_name' => $assign['zone_name'] ?? null,
             'trip_id' => $assign['trip_id'] ?? null,
             'vehicle_id' => $assign['vehicle_id'] ?? null,
             'vehicle_name' => $assign['vehicle_name'] ?? null,
+            'vehicle_plate' => $assign['vehicle_plate'] ?? null,
             'capacity_kg' => $assign['capacity_kg'] ?? 0,
             'loaded_kg' => $assign['loaded_kg'] ?? 0,
             'free_kg' => $assign['free_kg'] ?? 0,
