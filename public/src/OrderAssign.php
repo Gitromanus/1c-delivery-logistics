@@ -54,27 +54,67 @@ class OrderAssign
     }
 
     /**
-     * Снять с рейса → нераспределённые (status = new).
+     * Снять с рейса по id заявки.
      */
     public static function unassign(PDO $pdo, int $orderId): array
     {
         $result = self::emptyResult(null);
+        $result['unassigned'] = true;
+        $result['deleted_links'] = 0;
+
         if ($orderId <= 0) {
             $result['message'] = 'order_id required';
             return $result;
         }
 
-        $pdo->prepare('DELETE FROM trip_items WHERE order_id = ?')->execute([$orderId]);
+        $del = $pdo->prepare('DELETE FROM trip_items WHERE order_id = ?');
+        $del->execute([$orderId]);
+        $deleted = (int) $del->rowCount();
+
         $pdo->prepare("UPDATE orders SET status = 'new' WHERE id = ?")->execute([$orderId]);
 
-        $st = $pdo->prepare('SELECT zone_id FROM orders WHERE id = ?');
+        $st = $pdo->prepare('SELECT zone_id, external_id FROM orders WHERE id = ?');
         $st->execute([$orderId]);
-        $zid = $st->fetchColumn();
-        $result['zone_id'] = $zid !== false && $zid !== null ? (int) $zid : null;
-        $result['message'] = 'Заявка снята с рейса (нераспределённые)';
-        $result['unassigned'] = true;
+        $row = $st->fetch();
+        if ($row) {
+            $result['zone_id'] = $row['zone_id'] !== null ? (int) $row['zone_id'] : null;
+            $result['external_id'] = $row['external_id'];
+        }
+
+        $result['order_id'] = $orderId;
+        $result['deleted_links'] = $deleted;
+        $result['message'] = $deleted > 0
+            ? 'Снята с рейса → нераспределённые'
+            : 'Уже была вне рейса → нераспределённые';
 
         return $result;
+    }
+
+    /**
+     * Снять по external_id (GUID из 1С), даже если order_id ещё не знаем.
+     */
+    public static function unassignByExternalId(PDO $pdo, string $externalId): array
+    {
+        $externalId = mb_substr(trim($externalId), 0, 100);
+        $result = self::emptyResult(null);
+        $result['unassigned'] = true;
+        $result['deleted_links'] = 0;
+
+        if ($externalId === '') {
+            $result['message'] = 'external_id required';
+            return $result;
+        }
+
+        $st = $pdo->prepare('SELECT id, zone_id FROM orders WHERE external_id = ? LIMIT 1');
+        $st->execute([$externalId]);
+        $row = $st->fetch();
+        if (!$row) {
+            $result['message'] = 'Заявка не найдена на сайте';
+            return $result;
+        }
+
+        $orderId = (int) $row['id'];
+        return self::unassign($pdo, $orderId);
     }
 
     private static function emptyResult(?int $zoneId): array
@@ -94,6 +134,7 @@ class OrderAssign
             'load_percent' => 0,
             'message' => '',
             'unassigned' => false,
+            'deleted_links' => 0,
         ];
     }
 
@@ -127,6 +168,7 @@ class OrderAssign
                 'load_percent' => 0,
                 'message' => 'Рейс не найден',
                 'unassigned' => false,
+                'deleted_links' => 0,
             ];
         }
 
@@ -184,6 +226,7 @@ class OrderAssign
             'load_percent' => $pct,
             'message' => $msg,
             'unassigned' => false,
+            'deleted_links' => 0,
         ];
     }
 

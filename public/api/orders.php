@@ -1,10 +1,7 @@
 <?php
 /**
  * Приём заявок из 1С.
- *
- * Поля:
- *   assign_trip: true|false  — ставить в рейс (по умолчанию true)
- *   action: "unassign"       — снять с рейса → нераспределённые
+ * assign_trip: false / action: unassign → удаление из trip_items + status=new
  */
 require dirname(__DIR__) . '/bootstrap.php';
 
@@ -62,15 +59,15 @@ if ($hasCoords) {
         "INSERT INTO orders (external_id, number, doc_date, partner, address, lat, lon, weight_kg, amount, comment, zone_id, status)
          VALUES (:external_id, :number, :doc_date, :partner, :address, :lat, :lon, :weight_kg, :amount, :comment, :zone_id, :status)
          ON DUPLICATE KEY UPDATE
-           number = VALUES(number),
-           doc_date = VALUES(doc_date),
-           partner = VALUES(partner),
-           address = VALUES(address),
+           number = COALESCE(VALUES(number), number),
+           doc_date = COALESCE(VALUES(doc_date), doc_date),
+           partner = COALESCE(VALUES(partner), partner),
+           address = IF(VALUES(address) IN ('', '—'), address, VALUES(address)),
            lat = COALESCE(VALUES(lat), lat),
            lon = COALESCE(VALUES(lon), lon),
            weight_kg = VALUES(weight_kg),
-           amount = VALUES(amount),
-           comment = VALUES(comment),
+           amount = COALESCE(VALUES(amount), amount),
+           comment = COALESCE(VALUES(comment), comment),
            zone_id = COALESCE(VALUES(zone_id), zone_id),
            status = VALUES(status),
            updated_at = CURRENT_TIMESTAMP"
@@ -80,13 +77,13 @@ if ($hasCoords) {
         "INSERT INTO orders (external_id, number, doc_date, partner, address, weight_kg, amount, comment, zone_id, status)
          VALUES (:external_id, :number, :doc_date, :partner, :address, :weight_kg, :amount, :comment, :zone_id, :status)
          ON DUPLICATE KEY UPDATE
-           number = VALUES(number),
-           doc_date = VALUES(doc_date),
-           partner = VALUES(partner),
-           address = VALUES(address),
+           number = COALESCE(VALUES(number), number),
+           doc_date = COALESCE(VALUES(doc_date), doc_date),
+           partner = COALESCE(VALUES(partner), partner),
+           address = IF(VALUES(address) IN ('', '—'), address, VALUES(address)),
            weight_kg = VALUES(weight_kg),
-           amount = VALUES(amount),
-           comment = VALUES(comment),
+           amount = COALESCE(VALUES(amount), amount),
+           comment = COALESCE(VALUES(comment), comment),
            zone_id = COALESCE(VALUES(zone_id), zone_id),
            status = VALUES(status),
            updated_at = CURRENT_TIMESTAMP"
@@ -104,22 +101,32 @@ foreach ($items as $i => $row) {
         continue;
     }
 
-    $action = strtolower(trim((string) ($row['action'] ?? $data['action'] ?? '')));
+    $externalId = mb_substr(trim((string) $row['external_id']), 0, 100);
+    $action = strtolower(trim((string) ($row['action'] ?? '')));
+    if ($action === '' && isset($data['action'])) {
+        $action = strtolower(trim((string) $data['action']));
+    }
+
+    // assign_trip: по умолчанию true; false / 0 / "false" → не ставить в рейс
     $assignTrip = true;
     if (array_key_exists('assign_trip', $row)) {
-        $assignTrip = filter_var($row['assign_trip'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-        if ($assignTrip === null) {
-            $assignTrip = !in_array($row['assign_trip'], [0, '0', 'false', 'False', false], true);
+        $v = $row['assign_trip'];
+        if ($v === false || $v === 0 || $v === '0' || $v === 'false' || $v === 'False' || $v === 'FALSE') {
+            $assignTrip = false;
+        } elseif ($v === true || $v === 1 || $v === '1' || $v === 'true' || $v === 'True') {
+            $assignTrip = true;
+        } else {
+            $assignTrip = (bool) $v;
         }
-    } elseif (array_key_exists('assign_trip', $data)) {
-        $assignTrip = filter_var($data['assign_trip'], FILTER_VALIDATE_BOOLEAN);
     }
     if ($action === 'unassign') {
         $assignTrip = false;
     }
 
+    $doUnassign = ($action === 'unassign' || !$assignTrip);
+
     $address = trim((string) ($row['address'] ?? ''));
-    if ($address === '' && $action !== 'unassign') {
+    if ($address === '' && !$doUnassign) {
         $errors[] = "Item $i: address required";
         continue;
     }
@@ -139,9 +146,26 @@ foreach ($items as $i => $row) {
     $docDate = !empty($row['doc_date']) ? (string) $row['doc_date'] : date('Y-m-d');
     $weightKg = isset($row['weight_kg']) ? (float) $row['weight_kg'] : 0;
 
-    // unassign по external_id без полного адреса
-    if ($action === 'unassign' || !$assignTrip) {
-        // при обычном upsert без рейса — геокод/зона всё же полезны
+    // --- Быстрый путь: только снять с рейса ---
+    if ($action === 'unassign' && class_exists('OrderAssign')) {
+        try {
+            $assign = OrderAssign::unassignByExternalId($pdo, $externalId);
+            // если заявки ещё нет — создадим минимальную запись
+            if (($assign['message'] ?? '') === 'Заявка не найдена на сайте' && $address !== '') {
+                // fall through to full upsert below
+            } else {
+                $saved++;
+                $details[] = array_merge([
+                    'external_id' => $externalId,
+                    'action' => 'unassign',
+                    'unassigned' => true,
+                ], $assign);
+                continue;
+            }
+        } catch (Throwable $e) {
+            $errors[] = "Item $i: " . $e->getMessage();
+            continue;
+        }
     }
 
     if ($hasCoords && $lat === null && $lon === null && $address !== '') {
@@ -162,11 +186,9 @@ foreach ($items as $i => $row) {
         $zoneId = ZoneMatcher::matchZoneId($pdo, $address);
     }
 
-    $status = $assignTrip ? 'new' : 'new'; // до assign; unassign тоже new
-
     try {
         $params = [
-            ':external_id' => mb_substr((string) $row['external_id'], 0, 100),
+            ':external_id' => $externalId,
             ':number' => isset($row['number']) ? mb_substr((string) $row['number'], 0, 50) : null,
             ':doc_date' => $docDate,
             ':partner' => isset($row['partner']) ? mb_substr((string) $row['partner'], 0, 255) : null,
@@ -182,12 +204,11 @@ foreach ($items as $i => $row) {
             $params[':lon'] = $lon;
         }
 
-        // Только unassign по известному external_id — без обязательного upsert адреса? делаем upsert всегда
         $upsert->execute($params);
         $saved++;
 
         $idStmt = $pdo->prepare('SELECT id FROM orders WHERE external_id = ? LIMIT 1');
-        $idStmt->execute([$params[':external_id']]);
+        $idStmt->execute([$externalId]);
         $orderId = (int) $idStmt->fetchColumn();
 
         $assign = [
@@ -205,21 +226,17 @@ foreach ($items as $i => $row) {
             'load_percent' => 0,
             'message' => '',
             'unassigned' => true,
+            'deleted_links' => 0,
         ];
 
         if ($orderId > 0 && class_exists('OrderAssign')) {
-            if ($action === 'unassign' || !$assignTrip) {
+            if ($doUnassign) {
+                // Явно снимаем с рейса (и если уже стояла)
                 $assign = OrderAssign::unassign($pdo, $orderId);
-                // зона могла определиться выше — сохраним
                 if ($zoneId) {
                     $pdo->prepare('UPDATE orders SET zone_id = COALESCE(zone_id, ?) WHERE id = ?')
                         ->execute([$zoneId, $orderId]);
                     $assign['zone_id'] = $zoneId;
-                }
-                if ($action === 'unassign') {
-                    $assign['message'] = 'Снята с рейса → нераспределённые';
-                } else {
-                    $assign['message'] = 'В нераспределённых (без рейса)';
                 }
             } elseif ($zoneId) {
                 $assign = OrderAssign::toTrip($pdo, $orderId, $zoneId, $docDate, $weightKg);
@@ -233,7 +250,7 @@ foreach ($items as $i => $row) {
         }
 
         $details[] = [
-            'external_id' => $params[':external_id'],
+            'external_id' => $externalId,
             'order_id' => $orderId,
             'lat' => $lat,
             'lon' => $lon,
@@ -250,7 +267,8 @@ foreach ($items as $i => $row) {
             'overload_kg' => $assign['overload_kg'] ?? 0,
             'load_percent' => $assign['load_percent'] ?? 0,
             'message' => $assign['message'] ?? '',
-            'unassigned' => !empty($assign['unassigned']) || !$assignTrip || $action === 'unassign',
+            'unassigned' => $doUnassign || !empty($assign['unassigned']),
+            'deleted_links' => $assign['deleted_links'] ?? 0,
             'geo_provider' => $geoProvider,
             'geo_error' => $geoError,
         ];
