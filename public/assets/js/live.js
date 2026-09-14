@@ -1,4 +1,4 @@
-/** live.js v10 — poll, theme, vehicles by date */
+/** live.js v11 — poll, theme, vehicles by date, zone load from trips */
 (function () {
   function loadScript(id, src) {
     if (document.getElementById(id)) return;
@@ -21,7 +21,9 @@
   }
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
-    try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch (e) {}
     var btn = document.getElementById('themeToggle');
     if (btn) {
       btn.textContent = theme === 'light' ? '🌙' : '☀️';
@@ -66,20 +68,95 @@
     return document.body.classList.contains('dd-dragging');
   }
 
-  /** Расставить чипы машин по зонам рейсов выбранной даты */
+  function fmtKg(n) {
+    return Math.round(Number(n) || 0).toLocaleString('ru-RU');
+  }
+
+  /** Загрузка зоны = рейсы зоны + нераспределённые */
+  function updateZoneStats() {
+    nativeFetch('api/desk_zone_stats.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (data) {
+        if (!data || !data.ok || !data.stats) return;
+        var map = {};
+        data.stats.forEach(function (s) {
+          map[String(s.zone_id)] = s;
+        });
+
+        document.querySelectorAll('.zone-card[data-zone-drop]').forEach(function (card) {
+          var zid = card.getAttribute('data-zone-drop');
+          var s = map[zid] || { cnt: 0, weight: 0 };
+          var w = Number(s.weight) || 0;
+          var cnt = Number(s.cnt) || 0;
+          card.setAttribute('data-order-w', String(w));
+
+          var meta = card.querySelector('.meta');
+          if (meta) {
+            meta.textContent = cnt + ' заявок · ' + fmtKg(w) + ' кг';
+            meta.removeAttribute('data-compact');
+            meta.style.display = '';
+          }
+
+          var totCap = 0;
+          card.querySelectorAll('.veh-chip[data-cap]').forEach(function (ch) {
+            totCap += parseFloat(ch.getAttribute('data-cap')) || 0;
+          });
+
+          var bar = card.querySelector('.bar');
+          if (bar) {
+            var pct = totCap > 0 ? Math.min(100, Math.round((w / totCap) * 100)) : 0;
+            bar.classList.toggle('over', w > totCap + 0.01);
+            var i = bar.querySelector('i');
+            if (i) i.style.width = pct + '%';
+          }
+
+          var cap = card.querySelector('.zone-cap');
+          if (cap) {
+            var nVeh = card.querySelectorAll('.veh-chip[data-vehicle-id]').length;
+            cap.textContent =
+              'Загружено: ' +
+              fmtKg(w) +
+              ' / ' +
+              fmtKg(totCap) +
+              ' кг · машин: ' +
+              nVeh;
+            cap.removeAttribute('data-compact');
+            card.removeAttribute('data-zone-compact');
+          }
+
+          var badge = card.querySelector('.badge-corner');
+          if (badge) {
+            if (cnt === 0) {
+              badge.textContent = 'Пусто';
+              badge.className = 'badge badge-ok badge-corner';
+            } else if (totCap > 0 && w > totCap + 0.01) {
+              badge.textContent = 'Перегруз';
+              badge.className = 'badge badge-warn badge-corner';
+            } else {
+              badge.textContent = 'В работе';
+              badge.className = 'badge badge-ok badge-corner';
+            }
+          }
+        });
+      })
+      .catch(function () {});
+  }
+
   function placeVehiclesByDate() {
     nativeFetch('api/desk_vehicles.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        return r.json();
+      })
       .then(function (data) {
         if (!data || !data.ok || !data.vehicles) return;
 
-        // Собрать существующие чипы
         var chips = {};
         document.querySelectorAll('.veh-chip[data-vehicle-id]').forEach(function (ch) {
           chips[ch.getAttribute('data-vehicle-id')] = ch;
         });
 
-        // Очистить контейнеры
         document.querySelectorAll('.zone-vehicles').forEach(function (box) {
           box.innerHTML = '';
         });
@@ -87,7 +164,9 @@
         data.vehicles.forEach(function (v) {
           var zid = String(v.zone_id);
           var vid = String(v.vehicle_id);
-          var box = document.querySelector('.zone-card[data-zone-drop="' + zid + '"] .zone-vehicles');
+          var box = document.querySelector(
+            '.zone-card[data-zone-drop="' + zid + '"] .zone-vehicles'
+          );
           if (!box) return;
           var ch = chips[vid];
           if (!ch) {
@@ -96,8 +175,7 @@
             ch.setAttribute('data-vehicle-id', vid);
             ch.setAttribute('data-cap', v.capacity_kg);
             ch.title = 'Перетащите в другую зону';
-            ch.innerHTML =
-              '<span class="veh-name"></span><span class="veh-cap"></span>';
+            ch.innerHTML = '<span class="veh-name"></span><span class="veh-cap"></span>';
             ch.querySelector('.veh-name').textContent = v.name;
             ch.querySelector('.veh-cap').textContent =
               Math.round(v.capacity_kg).toLocaleString('ru-RU') + ' кг';
@@ -114,14 +192,20 @@
             box.appendChild(empty);
           }
         });
+
+        updateZoneStats();
       })
-      .catch(function () {});
+      .catch(function () {
+        updateZoneStats();
+      });
   }
 
   window.deskAckLocalChange = function () {
     quietUntil = Date.now() + 30000;
     nativeFetch('api/desk_poll.php?date=' + encodeURIComponent(date), { cache: 'no-store' })
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        return r.json();
+      })
       .then(function (data) {
         if (data && data.ok && data.version) lastVersion = data.version;
       })
