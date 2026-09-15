@@ -10,7 +10,7 @@ $view = __DIR__ . '/desk_view.php';
 if (!is_file($view) || filesize($view) < 10000) {
     $b64 = '';
     $ok = true;
-    for ($i = 0; $i <= 6; $i++) {
+    for ($i = 0; $i <= 1; $i++) {
         $f = __DIR__ . '/view_chunk_' . $i . '.php';
         if (!is_file($f)) { $ok = false; break; }
         $b64 .= (string) require $f;
@@ -27,8 +27,7 @@ if (!is_file($view) || filesize($view) < 10000) {
 if (!is_file($view) || filesize($view) < 1000) {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
-    echo "Нужен файл desk_view.php в корне сайта.\n";
-    echo "Скачайте из репозитория (artifacts) или дождитесь деплоя view_chunk_*.php\n";
+    echo "Нужен файл desk_view.php (или view_chunk_0.php + view_chunk_1.php).\n";
     exit;
 }
 require $view;
