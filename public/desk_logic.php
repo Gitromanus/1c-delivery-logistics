@@ -76,6 +76,7 @@ if (($deskFilter['mode'] ?? '') === 'driver') {
 }
 
 $itemsByTrip = [];
+$allowedOrderIds = []; // для фильтра карты
 if ($trips) {
     $ids = array_column($trips, 'id');
     $in = implode(',', array_map('intval', $ids));
@@ -88,6 +89,7 @@ if ($trips) {
     )->fetchAll();
     foreach ($items as $it) {
         $itemsByTrip[$it['trip_id']][] = $it;
+        $allowedOrderIds[(int) $it['id']] = true;
     }
 }
 
@@ -133,10 +135,40 @@ $mapOrders = $pdo->prepare(
 $mapOrders->execute([$date]);
 $mapPoints = $mapOrders->fetchAll();
 
+// Карта: только доступные по роли точки
+if (($deskFilter['mode'] ?? '') === 'driver') {
+    // только заявки в рейсе(ах) этой машины
+    $mapPoints = array_values(array_filter($mapPoints, function ($p) use ($allowedOrderIds) {
+        return isset($allowedOrderIds[(int) $p['id']]);
+    }));
+} elseif (($deskFilter['mode'] ?? '') === 'sales') {
+    $zid = (int) ($deskFilter['zone_id'] ?? 0);
+    // зона торгового + нераспределённые этой зоны (уже в freeOrders)
+    $mapPoints = array_values(array_filter($mapPoints, function ($p) use ($zid, $allowedOrderIds) {
+        $oz = (int) ($p['zone_id'] ?? 0);
+        if ($oz === $zid) {
+            return true;
+        }
+        // также точки, попавшие в рейсы этой зоны
+        return isset($allowedOrderIds[(int) $p['id']]);
+    }));
+}
+
 $zonePolys = $pdo->query(
     "SELECT zp.zone_id, zp.polygon, zp.color, z.name AS zone_name
      FROM zone_polygons zp JOIN zones z ON z.id = zp.zone_id"
 )->fetchAll();
+
+// Полигоны только доступных зон
+if (($deskFilter['mode'] ?? '') === 'driver' || ($deskFilter['mode'] ?? '') === 'sales') {
+    $allowedZoneIds = [];
+    foreach ($zones as $z) {
+        $allowedZoneIds[(int) $z['id']] = true;
+    }
+    $zonePolys = array_values(array_filter($zonePolys, function ($p) use ($allowedZoneIds) {
+        return isset($allowedZoneIds[(int) $p['zone_id']]);
+    }));
+}
 
 $needGeo = array_values(array_filter($mapPoints, function ($p) {
     return empty($p['lat']) || empty($p['lon']);
