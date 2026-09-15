@@ -44,7 +44,17 @@ if (is_file($srcDir . '/OrderAssign.php')) {
 if (is_file($srcDir . '/DeskVehicles.php')) {
     require_once $srcDir . '/DeskVehicles.php';
 }
+if (is_file($srcDir . '/Auth.php')) {
+    require_once $srcDir . '/Auth.php';
+}
+if (is_file($srcDir . '/Settings.php')) {
+    require_once $srcDir . '/Settings.php';
+}
 
 if (!defined('APP_ROOT')) {
     define('APP_ROOT', dirname($configPath));
+}
+
+if (class_exists('Auth')) {
+    Auth::startSession();
 }
