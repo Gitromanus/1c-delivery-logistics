@@ -5,14 +5,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Логистика доставки</title>
-<link rel="stylesheet" href="assets/css/style.css?v=12">
+<link rel="stylesheet" href="assets/css/style.css?v=13">
 <?php if ($yandexKey !== ''): ?>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=<?= h($yandexKey) ?>&lang=ru_RU"></script>
 <?php endif; ?>
-<script src="assets/js/live.js?v=17" defer></script>
-<script src="assets/js/desk-dnd.js?v=7" defer></script>
+<script src="assets/js/live.js?v=18" defer></script>
+<script src="assets/js/desk-dnd.js?v=8" defer></script>
 <script src="assets/js/map-markers.js?v=6" defer></script>
-<script src="assets/js/desk-compact-v2.js?v=12" defer></script>
+<script src="assets/js/desk-compact-v2.js?v=13" defer></script>
 <script src="assets/js/theme.js"></script>
 </head>
 <body>
@@ -45,18 +45,24 @@
     $nVeh=count($zv); $noVeh=($nVeh===0 && $w>0.01);
     $zpct=$noVeh?100:($totCap>0?min(100,round($w/$totCap*100)):0);
     $barCls=$noVeh?'no-vehicle':($w>$totCap+0.01?'over':'');
+    $wShow = number_format($w,0,'.','');
+    $capShow = number_format($totCap,0,'.','');
   ?>
-  <div class="zone-card" data-zone-drop="<?=(int)$z['id']?>" data-order-w="<?=$w?>" style="border-left:6px solid <?=h($zcolor)?>">
+  <div class="zone-card" data-zone-drop="<?=(int)$z['id']?>" data-order-w="<?=$w?>" data-zone-compact="1" style="border-left:6px solid <?=h($zcolor)?>">
     <div class="name"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:<?=h($zcolor)?>;margin-right:6px;vertical-align:middle"></span><?=h($z['name'])?></div>
-    <div class="meta"><?=$cnt?> заявок · <?=number_format($w,0,'.',' ')?> кг</div>
+    <div class="meta" style="display:none"><?=$cnt?> заявок · <?=$wShow?> кг</div>
     <span class="badge badge-corner <?=$noVeh?'badge-warn':'badge-ok'?>"><?=$cnt===0?'Пусто':($noVeh?'Нет машин':'В работе')?></span>
     <div class="bar <?=$barCls?>"><i style="width:<?=$zpct?>%"></i></div>
-    <div class="zone-cap">Загружено: <?=number_format($w,0,'.',' ')?> / <?=number_format($totCap,0,'.',' ')?> кг · машин: <?=$nVeh?></div>
+    <div class="zone-cap">
+      <span class="cap-load" title="Загрузка, кг"><span class="ic ic-scale" aria-hidden="true"></span><?=$wShow?> / <?=$capShow?></span>
+      <span class="cap-veh" title="Машин"><span class="ic ic-truck" aria-hidden="true"></span><?=$nVeh?></span>
+      <span class="cap-orders meta-orders" title="Заявок"><span class="ic ic-box" aria-hidden="true"></span><?=$cnt?></span>
+    </div>
     <div class="zone-vehicles">
       <?php foreach($zv as $vv): ?>
       <div class="veh-chip" data-vehicle-id="<?=(int)$vv['vehicle_id']?>" data-zone-id="<?=(int)$z['id']?>" data-cap="<?=(float)$vv['capacity_kg']?>">
         <span class="veh-name"><?=h($vv['name'])?></span>
-        <span class="veh-cap"><?=number_format((float)$vv['capacity_kg'],0,'.',' ')?> кг</span>
+        <span class="veh-cap"><?=number_format((float)$vv['capacity_kg'],0,'.','')?> кг</span>
       </div>
       <?php endforeach; ?>
       <?php if(!$zv): ?><span class="muted zone-empty">нет машин</span><?php endif; ?>
@@ -76,16 +82,15 @@
     <?php if(!$freeOrders): ?>
     <p class="muted" style="text-align:center">Пусто</p>
     <?php else: foreach($freeOrders as $o): ?>
-    <div class="drag-order" data-order-id="<?=(int)$o['id']?>" data-from-trip="" data-weight="<?=(float)$o['weight_kg']?>"
-      style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:6px;border:1px solid #2f3546;border-radius:8px;background:#1c2130;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.25)">
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:700;font-size:14px;color:#f1f3f7;line-height:1.25"><?=h($o['number']?:$o['external_id'])?></div>
-        <div style="font-size:12px;color:#9aa0a6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?=h($o['address'])?></div>
+    <div class="drag-order" data-order-id="<?=(int)$o['id']?>" data-from-trip="" data-weight="<?=(float)$o['weight_kg']?>">
+      <div class="ord-body">
+        <div class="ord-num"><?=h($o['number']?:$o['external_id'])?></div>
+        <div class="ord-addr"><?=h($o['address'])?></div>
         <?php if (!empty($o['partner'])): ?>
-        <div style="font-size:12px;color:#b6bcc6;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px"><?=h($o['partner'])?></div>
+        <div class="ord-partner"><?=h($o['partner'])?></div>
         <?php endif; ?>
       </div>
-      <span style="flex:0 0 auto;font-size:12px;font-weight:700;background:#2b3245;color:#dfe3ea;border-radius:20px;padding:3px 10px"><?=number_format((float)$o['weight_kg'],0,'.',' ')?> кг</span>
+      <span class="ord-kg"><?=number_format((float)$o['weight_kg'],0,'.','')?> кг</span>
     </div>
     <?php endforeach; endif; ?>
   </div>
@@ -97,6 +102,9 @@
     $list=$itemsByTrip[$t['id']]??[]; $sum=0;
     foreach($list as $o) $sum+=(float)$o['weight_kg'];
     $cap=(float)$t['capacity_kg']; $pct=$cap>0?min(100,round($sum/$cap*100)):0; $over=$sum>$cap+0.01;
+    $nOrd=count($list);
+    $sumShow=number_format($sum,0,'.','');
+    $capShow=number_format($cap,0,'.','');
   ?>
   <div class="trip" data-trip-id="<?=(int)$t['id']?>" data-cap="<?=$cap?>">
     <div class="title">
@@ -107,20 +115,22 @@
     </div>
     <div class="muted"><?=h($t['zone_name']?:'Зона не указана')?> · <?=h($tripStatusLabels[$t['status']]??$t['status'])?></div>
     <div class="bar <?=$over?'over':''?>"><i style="width:<?=$pct?>%"></i></div>
-    <div class="trip-weight muted"><?=number_format($sum,0,'.',' ')?> / <?=number_format($cap,0,'.',' ')?> кг</div>
+    <div class="trip-weight muted" data-compact="1" data-compact-n="<?=$nOrd?>">
+      <span class="trip-load" title="Загрузка, кг"><span class="ic ic-scale" aria-hidden="true"></span><?=$sumShow?> / <?=$capShow?></span>
+      <span class="trip-orders meta-orders" title="Заявок"><span class="ic ic-box" aria-hidden="true"></span><?=$nOrd?></span>
+    </div>
     <div class="trip-body">
       <div class="orders-list" style="margin-top:8px">
         <?php foreach($list as $o): ?>
-        <div class="drag-order" data-order-id="<?=(int)$o['id']?>" data-from-trip="<?=(int)$t['id']?>" data-weight="<?=(float)$o['weight_kg']?>"
-          style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:6px;border:1px solid #2f3546;border-radius:8px;background:#1c2130;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.25)">
-          <div style="flex:1;min-width:0">
-            <div style="font-weight:700;font-size:14px;color:#f1f3f7;line-height:1.25"><?=h($o['number']?:$o['external_id'])?></div>
-            <div style="font-size:12px;color:#9aa0a6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?=h($o['address'])?></div>
+        <div class="drag-order" data-order-id="<?=(int)$o['id']?>" data-from-trip="<?=(int)$t['id']?>" data-weight="<?=(float)$o['weight_kg']?>">
+          <div class="ord-body">
+            <div class="ord-num"><?=h($o['number']?:$o['external_id'])?></div>
+            <div class="ord-addr"><?=h($o['address'])?></div>
             <?php if (!empty($o['partner'])): ?>
-            <div style="font-size:12px;color:#b6bcc6;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px"><?=h($o['partner'])?></div>
+            <div class="ord-partner"><?=h($o['partner'])?></div>
             <?php endif; ?>
           </div>
-          <span style="flex:0 0 auto;font-size:12px;font-weight:700;background:#2b3245;color:#dfe3ea;border-radius:20px;padding:3px 10px"><?=number_format((float)$o['weight_kg'],0,'.',' ')?> кг</span>
+          <span class="ord-kg"><?=number_format((float)$o['weight_kg'],0,'.','')?> кг</span>
         </div>
         <?php endforeach; ?>
       </div>
