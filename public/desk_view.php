@@ -5,14 +5,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Логистика доставки</title>
-<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/style.css?v=12">
 <?php if ($yandexKey !== ''): ?>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=<?= h($yandexKey) ?>&lang=ru_RU"></script>
 <?php endif; ?>
-<script src="assets/js/live.js?v=16" defer></script>
-<script src="assets/js/desk-dnd.js?v=2" defer></script>
-<script src="assets/js/map-markers.js?v=4" defer></script>
-<script src="assets/js/desk-compact-v2.js?v=11" defer></script>
+<script src="assets/js/live.js?v=17" defer></script>
+<script src="assets/js/desk-dnd.js?v=7" defer></script>
+<script src="assets/js/map-markers.js?v=6" defer></script>
+<script src="assets/js/desk-compact-v2.js?v=12" defer></script>
 <script src="assets/js/theme.js"></script>
 </head>
 <body>
@@ -161,13 +161,6 @@ function drawZones(map) {
     } catch (e) {}
   });
 }
-function addMarks(map, points) {
-  // map-markers.js перехватит и построит метки с номерами
-  window.__logisticsMap = map;
-  if (typeof window.refreshOrderMarks === 'function') {
-    try { window.refreshOrderMarks(map); } catch (e) {}
-  }
-}
 if (typeof ymaps !== 'undefined' && document.getElementById('map')) {
   ymaps.ready(function () {
     var map = new ymaps.Map('map', {
@@ -177,10 +170,11 @@ if (typeof ymaps !== 'undefined' && document.getElementById('map')) {
     });
     window.__logisticsMap = map;
     drawZones(map);
-    addMarks(map, mapPoints);
-    if (typeof window.refreshOrderMarks === 'function') {
-      try { window.refreshOrderMarks(map); } catch (e) {}
-    }
+    setTimeout(function () {
+      if (typeof window.rebuildMapMarks === 'function') {
+        try { window.rebuildMapMarks(); } catch (e) {}
+      }
+    }, 100);
   });
 }
 </script>
