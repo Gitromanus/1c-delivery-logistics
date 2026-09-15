@@ -3,7 +3,6 @@
  */
 (function () {
 'use strict';
-// Кастомное перетаскивание мышью: непрозрачная карточка + раздвигание списка (место вставки)
 let ddPotential = null;
 let ddDrag = null;
 let ddGap = null;
@@ -116,7 +115,6 @@ async function ddApplyMove(drag, target, insertBeforeEl) {
       if (!fromTrip) {
         params = { action: 'add', order_id: oid, to_trip_id: target.tripId };
       } else if (String(fromTrip) === String(target.tripId)) {
-        // reorder inside same trip
         var list = ddBuildOrderList(target.container, oid, null);
         params = { action: 'reorder', trip_id: target.tripId, order_ids: list };
       } else {
@@ -137,12 +135,12 @@ async function ddApplyMove(drag, target, insertBeforeEl) {
 }
 function ddBuildOrderList(container, orderId, y) {
   const all = Array.from(container.querySelectorAll(':scope > .drag-order'));
-  const ids = all.map(function (o) { return parseInt(o.getAttribute('data-order-id'), 10); }).filter(Boolean);
-  return ids;
+  return all.map(function (o) { return parseInt(o.getAttribute('data-order-id'), 10); }).filter(Boolean);
 }
 
 document.addEventListener('mousedown', function (e) {
   if (e.button !== 0) return;
+  if (e.target.closest('button, a, input, select')) return;
   const ord = e.target.closest('.drag-order');
   const veh = e.target.closest('.veh-chip');
   if (ord) {
@@ -184,25 +182,25 @@ document.addEventListener('mouseup', function (e) {
   ddFinish(e);
 });
 
-let orderMarks = {};
 function highlightOrder(id) {
   document.querySelectorAll('.drag-order').forEach(function (c) {
     c.style.outline = '';
     c.style.outlineOffset = '';
   });
-  Object.keys(orderMarks).forEach(function (k) {
-    const m = orderMarks[k];
+  var marks = window.orderMarks || {};
+  Object.keys(marks).forEach(function (k) {
+    var m = marks[k];
     if (m && m.__origPreset) {
       try { m.options.set('preset', m.__origPreset); } catch (e) {}
     }
   });
-  const card = document.querySelector('.drag-order[data-order-id="' + id + '"]');
+  var card = document.querySelector('.drag-order[data-order-id="' + id + '"]');
   if (card) {
     card.style.outline = '2px solid #f59e0b';
     card.style.outlineOffset = '-2px';
     try { card.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
   }
-  const m = orderMarks[id];
+  var m = marks[id] || marks[String(id)];
   if (m) {
     try {
       if (window.__logisticsMap) window.__logisticsMap.panTo(m.geometry.getCoordinates(), { checkZoomRange: true, delay: 0 });
@@ -210,12 +208,20 @@ function highlightOrder(id) {
     try { m.options.set('preset', 'islands#redCircleDotIcon'); } catch (e) {}
   }
 }
-document.querySelectorAll('.drag-order').forEach(function (c) {
-  c.addEventListener('click', function () {
-    highlightOrder(parseInt(c.getAttribute('data-order-id'), 10));
-  });
-});
 
-window.orderMarks = orderMarks;
+function bindOrderClicks() {
+  document.querySelectorAll('.drag-order').forEach(function (c) {
+    if (c.getAttribute('data-hl-bound')) return;
+    c.setAttribute('data-hl-bound', '1');
+    c.addEventListener('click', function () {
+      if (document.body.classList.contains('dd-dragging')) return;
+      highlightOrder(parseInt(c.getAttribute('data-order-id'), 10));
+    });
+  });
+}
+bindOrderClicks();
+setTimeout(bindOrderClicks, 500);
+
 window.highlightOrder = highlightOrder;
+if (!window.orderMarks) window.orderMarks = {};
 })();
