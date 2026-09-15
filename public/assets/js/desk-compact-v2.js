@@ -1,22 +1,26 @@
 /**
- * Компактные подписи (только mobile) + Навигатор.
+ * Компактные подписи + Навигатор (SVG-пин).
  */
 (function () {
   var IC_SCALE = '<span class="ic ic-scale" aria-hidden="true"></span>';
   var IC_TRUCK = '<span class="ic ic-truck" aria-hidden="true"></span>';
   var IC_BOX = '<span class="ic ic-box" aria-hidden="true"></span>';
-  var NAVI_ICON = '<span class="navi-ico" aria-hidden="true">📍</span>';
+  var NAVI_ICON =
+    '<svg class="navi-ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">' +
+    '<path fill="currentColor" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/>' +
+    '</svg>';
   var busy = false;
   var timer = null;
-
-  function isNarrow() {
-    try { return window.matchMedia('(max-width: 900px)').matches; } catch (e) { return window.innerWidth <= 900; }
-  }
 
   function compactZoneCard(card) {
     if (!card || card.getAttribute('data-zone-compact') === '1') return;
     var cap = card.querySelector('.zone-cap');
     if (!cap) return;
+    // уже с иконками с сервера
+    if (cap.querySelector('.cap-load')) {
+      card.setAttribute('data-zone-compact', '1');
+      return;
+    }
     var meta = card.querySelector('.meta');
     var t = (cap.textContent || '').replace(/\s+/g, ' ').trim();
     var load = t.match(/([\d\s]+)\s*\/\s*([\d\s]+)/);
@@ -43,6 +47,10 @@
 
   function compactTripWeight(el) {
     if (!el) return;
+    if (el.querySelector('.trip-load')) {
+      el.setAttribute('data-compact', '1');
+      return;
+    }
     var trip = el.closest('.trip');
     var n = trip ? trip.querySelectorAll('.orders-list > .drag-order').length : 0;
     if (el.getAttribute('data-compact') === '1' && el.getAttribute('data-compact-n') === String(n)) return;
@@ -101,19 +109,27 @@
   function layoutTripTitle(trip) {
     var title = trip.querySelector('.title');
     if (!title) return;
+
+    var actions = title.querySelector('.trip-actions');
+    if (!actions) {
+      actions = document.createElement('div');
+      actions.className = 'trip-actions';
+      title.appendChild(actions);
+    }
+
     var navi = title.querySelector('.btn-navi, .btn-icon-navi');
     var toggle = title.querySelector('.trip-toggle');
-    if (navi && toggle && navi.nextSibling !== toggle) {
-      title.appendChild(navi);
-      title.appendChild(toggle);
-    }
+    if (navi && navi.parentNode !== actions) actions.appendChild(navi);
+    if (toggle && toggle.parentNode !== actions) actions.appendChild(toggle);
   }
 
   function addNaviButtons() {
     document.querySelectorAll('.trip').forEach(function (trip) {
       var title = trip.querySelector('.title');
       if (!title) return;
-      if (!trip.querySelector('.btn-navi, .btn-icon-navi')) {
+
+      var existing = trip.querySelector('.btn-navi, .btn-icon-navi');
+      if (!existing) {
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'btn btn-primary btn-navi btn-icon-navi';
@@ -134,7 +150,13 @@
             if (maps) window.open(maps, '_blank');
           }, 700);
         });
-        title.appendChild(btn);
+        var actions = title.querySelector('.trip-actions');
+        if (actions) actions.insertBefore(btn, actions.firstChild);
+        else title.appendChild(btn);
+      } else if (!existing.querySelector('svg.navi-ico')) {
+        existing.classList.add('btn-icon-navi', 'btn-navi', 'btn-primary');
+        existing.innerHTML = NAVI_ICON;
+        existing.title = 'Маршрут всех точек рейса в Яндекс Навигаторе';
       }
       layoutTripTitle(trip);
     });
@@ -144,17 +166,7 @@
     if (busy) return;
     busy = true;
     try {
-      if (!isNarrow()) {
-        addNaviButtons();
-        return;
-      }
-      document.querySelectorAll('.zone-card').forEach(function (card) {
-        var cap = card.querySelector('.zone-cap');
-        if (cap && !cap.querySelector('.cap-load') && card.getAttribute('data-zone-compact') === '1') {
-          card.removeAttribute('data-zone-compact');
-        }
-        compactZoneCard(card);
-      });
+      document.querySelectorAll('.zone-card').forEach(compactZoneCard);
       document.querySelectorAll('.trip-weight').forEach(compactTripWeight);
       addNaviButtons();
     } finally {
