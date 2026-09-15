@@ -71,16 +71,36 @@
 
 /* --- admin mobile: larger touch targets --- */
 @media (max-width: 700px) {
-  .admin-nav {
-    gap: 8px;
+  .admin-nav,
+  .admin-tabs {
+    gap: 6px;
+    flex-wrap: wrap;
+    width: 100%;
   }
   .admin-nav a.btn,
-  .admin-nav .btn {
+  .admin-nav .btn,
+  .admin-tabs a {
     font-size: 15px !important;
     padding: 10px 14px !important;
     min-height: 44px;
     display: inline-flex;
     align-items: center;
+  }
+  .admin-tabs {
+    display: flex;
+    width: 100%;
+  }
+  .admin-tabs a {
+    flex: 1 1 auto;
+    justify-content: center;
+    text-align: center;
+  }
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .header .toolbar {
+    width: 100%;
   }
   .panel-head h2,
   .panel h2 {
@@ -114,5 +134,9 @@
   }
   .app {
     padding: 12px 10px 40px;
+  }
+  /* admin 3-col grid -> 1 col */
+  .grid[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
   }
 }
