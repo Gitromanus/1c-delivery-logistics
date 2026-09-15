@@ -9,10 +9,10 @@
 <?php if ($yandexKey !== ''): ?>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=<?= h($yandexKey) ?>&lang=ru_RU"></script>
 <?php endif; ?>
-<script src="assets/js/live.js?v=15" defer></script>
+<script src="assets/js/live.js?v=16" defer></script>
+<script src="assets/js/desk-dnd.js?v=2" defer></script>
 <script src="assets/js/map-markers.js?v=4" defer></script>
-<script src="assets/js/desk-navi.js?v=2" defer></script>
-<script src="assets/js/desk-compact-v2.js?v=10" defer></script>
+<script src="assets/js/desk-compact-v2.js?v=11" defer></script>
 <script src="assets/js/theme.js"></script>
 </head>
 <body>
@@ -102,7 +102,6 @@
     <div class="title">
       <span class="trip-name"><?=h($t['vehicle_name'])?><?=$t['plate']?' · '.h($t['plate']):''?></span>
       <div class="trip-actions">
-        <button type="button" class="btn-icon btn-icon-navi" title="Навигатор" data-navi-trip="<?=(int)$t['id']?>">📍</button>
         <button type="button" class="trip-toggle">▾</button>
       </div>
     </div>
@@ -135,7 +134,7 @@
 const mapPoints = <?= json_encode($mapPoints, JSON_UNESCAPED_UNICODE) ?>;
 const needGeo = <?= json_encode($needGeo, JSON_UNESCAPED_UNICODE) ?>;
 const zonePolys = <?= json_encode(array_map(function($p){
-  return ['zone_id'=>(int)$p['zone_id'],'zone_name'=>$p['zone_name'],'color'=>(string)($p['color']??''),'points'=>json_decode((string)$p['polygon'],true)?:[]];
+  return ['zone_id'=>(int)$p['zone_id'],'zone_name'=>$p['zone_name']??'','color'=>(string)($p['color']??''),'points'=>json_decode((string)$p['polygon'],true)?:[]];
 }, $zonePolys), JSON_UNESCAPED_UNICODE) ?>;
 
 document.querySelectorAll('.trip-toggle').forEach(function(btn){
@@ -163,21 +162,11 @@ function drawZones(map) {
   });
 }
 function addMarks(map, points) {
-  if (!points) return;
-  points.forEach(function (p) {
-    if (p.lat == null || p.lon == null || p.lat === '' || p.lon === '') return;
-    var lat = Number(p.lat), lon = Number(p.lon);
-    if (isNaN(lat) || isNaN(lon)) return;
-    try {
-      var preset = p.status === 'new' ? 'islands#orangeCircleIcon' : 'islands#blueCircleIcon';
-      var pm = new ymaps.Placemark([lat, lon], {
-        balloonContentHeader: p.number || p.external_id || '',
-        balloonContentBody: (p.address || '') + (p.partner ? '<br>' + p.partner : ''),
-        iconContent: ''
-      }, { preset: preset });
-      map.geoObjects.add(pm);
-    } catch (e) {}
-  });
+  // map-markers.js перехватит и построит метки с номерами
+  window.__logisticsMap = map;
+  if (typeof window.refreshOrderMarks === 'function') {
+    try { window.refreshOrderMarks(map); } catch (e) {}
+  }
 }
 if (typeof ymaps !== 'undefined' && document.getElementById('map')) {
   ymaps.ready(function () {
