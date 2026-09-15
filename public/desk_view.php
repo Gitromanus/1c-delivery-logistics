@@ -11,6 +11,9 @@
 <?php endif; ?>
 <script src="assets/js/live.js?v=15" defer></script>
 <script src="assets/js/map-markers.js?v=4" defer></script>
+<script src="assets/js/desk-navi.js?v=2" defer></script>
+<script src="assets/js/desk-compact-v2.js?v=10" defer></script>
+<script src="assets/js/theme.js"></script>
 </head>
 <body>
 <div class="app wide">
@@ -22,6 +25,9 @@
     </form>
     <?php if (!class_exists('Auth') || Auth::isAdmin() || !empty($_SESSION['config_admin'])): ?>
     <button type="button" class="btn btn-ghost" id="rebuildBtn">Пересобрать</button>
+    <?php if ($yandexKey !== '' && !empty($needGeo)): ?>
+    <button type="button" class="btn btn-primary" id="geocodeBtn">Геокод (<?= count($needGeo) ?>)</button>
+    <?php endif; ?>
     <a class="btn btn-ghost" href="admin/">Админка</a>
     <?php endif; ?>
     <a class="btn btn-ghost" href="logout.php">Выйти</a>
@@ -61,7 +67,7 @@
 <section class="panel map-panel">
   <h2>Карта</h2>
   <?php if($yandexKey===''): ?>
-  <p class="muted">Укажите ключ Яндекс.Карт в <a href="admin/settings.php">Настройках API</a> или config.php</p>
+  <p class="muted">Укажите ключ Яндекс.Карт в <a href="admin/?tab=settings">Настройках API</a> или config.php</p>
   <?php else: ?>
   <div id="map" class="map-box"></div>
   <?php endif; ?>
