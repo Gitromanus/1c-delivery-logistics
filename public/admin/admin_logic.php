@@ -83,6 +83,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 ->execute([(int) ($_POST['vehicle_id'] ?? 0), (int) ($_POST['zone_id'] ?? 0), !empty($_POST['is_primary']) ? 1 : 0]);
             $msg = 'Привязка сохранена';
             break;
+        case 'rebind':
+            $oldV = (int) ($_POST['old_vehicle_id'] ?? 0);
+            $oldZ = (int) ($_POST['old_zone_id'] ?? 0);
+            $newV = (int) ($_POST['vehicle_id'] ?? 0);
+            $newZ = (int) ($_POST['zone_id'] ?? 0);
+            if ($oldV && $oldZ && ($oldV !== $newV || $oldZ !== $newZ)) {
+                $pdo->prepare('DELETE FROM vehicle_zones WHERE vehicle_id=? AND zone_id=?')->execute([$oldV, $oldZ]);
+            }
+            $pdo->prepare('INSERT INTO vehicle_zones (vehicle_id, zone_id, is_primary) VALUES (?,?,?) ON DUPLICATE KEY UPDATE is_primary=VALUES(is_primary)')
+                ->execute([$newV, $newZ, !empty($_POST['is_primary']) ? 1 : 0]);
+            $msg = 'Привязка обновлена';
+            break;
         case 'unbind':
             $pdo->prepare('DELETE FROM vehicle_zones WHERE vehicle_id=? AND zone_id=?')
                 ->execute([(int) ($_POST['vehicle_id'] ?? 0), (int) ($_POST['zone_id'] ?? 0)]);
@@ -152,9 +164,11 @@ $zones = $pdo->query(
 )->fetchAll();
 $vehicles = $pdo->query('SELECT * FROM vehicles ORDER BY name')->fetchAll();
 $binds = $pdo->query(
-    'SELECT vz.*, v.name AS vname, z.name AS zname FROM vehicle_zones vz
+    'SELECT vz.*, v.name AS vname, v.plate AS vplate, z.name AS zname
+     FROM vehicle_zones vz
      JOIN vehicles v ON v.id = vz.vehicle_id
-     JOIN zones z ON z.id = vz.zone_id'
+     JOIN zones z ON z.id = vz.zone_id
+     ORDER BY v.name, z.name'
 )->fetchAll();
 $zonePolys = $pdo->query('SELECT zone_id, polygon, color FROM zone_polygons')->fetchAll();
 $polyMap = [];
@@ -168,7 +182,7 @@ foreach ($zonePolys as $zp) {
 $users = [];
 try {
     $users = $pdo->query(
-        'SELECT u.*, v.name AS vname, z.name AS zname
+        'SELECT u.*, v.name AS vname, v.plate AS vplate, z.name AS zname
          FROM users u
          LEFT JOIN vehicles v ON v.id = u.vehicle_id
          LEFT JOIN zones z ON z.id = u.zone_id
