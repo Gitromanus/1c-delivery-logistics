@@ -9,7 +9,7 @@ $app = __DIR__ . '/admin_app.full.php';
 if (!is_file($app) || filesize($app) < 10000) {
     $b64 = '';
     $ok = true;
-    for ($i = 0; $i <= 4; $i++) {
+    for ($i = 0; $i <= 1; $i++) {
         $f = __DIR__ . '/admin_chunk_' . $i . '.php';
         if (!is_file($f)) { $ok = false; break; }
         $b64 .= (string) require $f;
@@ -26,7 +26,7 @@ if (!is_file($app) || filesize($app) < 10000) {
 if (!is_file($app) || filesize($app) < 1000) {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
-    echo "Нужен файл admin/admin_app.full.php\n";
+    echo "Нужен файл admin/admin_app.full.php (или admin_chunk_0.php + admin_chunk_1.php).\n";
     exit;
 }
 require $app;
