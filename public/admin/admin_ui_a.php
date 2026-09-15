@@ -8,17 +8,52 @@
   <?php if (!empty($config['yandex_maps_key'])): ?>
   <script src="https://api-maps.yandex.ru/2.1/?apikey=<?= htmlspecialchars($config['yandex_maps_key']) ?>&lang=ru_RU"></script>
   <?php endif; ?>
+  <style>
+    .admin-tabs {
+      display: inline-flex;
+      gap: 4px;
+      background: var(--panel-2, #1c2130);
+      border: 1px solid var(--border, #2f3546);
+      border-radius: 10px;
+      padding: 3px;
+      margin-right: 12px;
+    }
+    .admin-tabs a {
+      display: inline-block;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--muted, #9aa0a6);
+      text-decoration: none;
+      border: none;
+      background: transparent;
+    }
+    .admin-tabs a:hover {
+      color: var(--text, #f1f3f7);
+      background: rgba(255,255,255,.06);
+    }
+    .admin-tabs a.is-active {
+      color: #fff;
+      background: var(--accent, #1a73e8);
+    }
+    .toolbar .btn-ghost.btn-nav {
+      opacity: 0.85;
+    }
+  </style>
 </head>
 <body>
 <div class="app">
   <header class="header">
     <div class="logo">Админка</div>
     <div class="toolbar">
-      <a class="btn btn-ghost<?= $tab==='main'?' btn-primary':'' ?>" href="?tab=main">Зоны и ТС</a>
-      <a class="btn btn-ghost<?= $tab==='users'?' btn-primary':'' ?>" href="?tab=users">Пользователи</a>
-      <a class="btn btn-ghost<?= $tab==='settings'?' btn-primary':'' ?>" href="?tab=settings">API</a>
-      <a class="btn btn-ghost" href="../">Рабочий стол</a>
-      <a class="btn btn-ghost" href="../logout.php">Выйти</a>
+      <nav class="admin-tabs" aria-label="Разделы админки">
+        <a class="<?= $tab==='main'?'is-active':'' ?>" href="?tab=main">Зоны и ТС</a>
+        <a class="<?= $tab==='users'?'is-active':'' ?>" href="?tab=users">Пользователи</a>
+        <a class="<?= $tab==='settings'?'is-active':'' ?>" href="?tab=settings">API</a>
+      </nav>
+      <a class="btn btn-ghost btn-nav" href="../">Рабочий стол</a>
+      <a class="btn btn-ghost btn-nav" href="../logout.php">Выйти</a>
     </div>
   </header>
   <?php if ($msg): ?><div class="flash flash-ok"><?= htmlspecialchars($msg) ?></div><?php endif; ?>
@@ -67,11 +102,14 @@
       <div class="panel-head"><h2>Привязки</h2>
         <button class="btn btn-ghost btn-sm" type="button" onclick="openBindAdd()">+ Привязать</button></div>
       <table><tr><th>Машина</th><th>Зона</th><th></th></tr>
-        <?php foreach ($binds as $b): ?>
+        <?php foreach ($binds as $b):
+          $vehLabel = ($b['vname'] ?? '') . (!empty($b['vplate']) ? ' · '.$b['vplate'] : '');
+        ?>
           <tr>
-            <td><?= htmlspecialchars($b['vname'] ?? $b['vehicle_name'] ?? '') ?></td>
-            <td><?= htmlspecialchars($b['zname'] ?? $b['zone_name'] ?? '') ?><?= !empty($b['is_primary']) ? ' ★' : '' ?></td>
-            <td style="text-align:right">
+            <td><?= htmlspecialchars($vehLabel) ?></td>
+            <td><?= htmlspecialchars($b['zname'] ?? '') ?><?= !empty($b['is_primary']) ? ' ★' : '' ?></td>
+            <td style="text-align:right;white-space:nowrap">
+              <button type="button" class="btn-icon" title="Изменить" onclick="editBind(<?= (int)$b['vehicle_id'] ?>, <?= (int)$b['zone_id'] ?>, <?= (int)!empty($b['is_primary']) ?>)">✎</button>
               <form method="post" style="display:inline" onsubmit="return confirm('Отвязать?')">
                 <input type="hidden" name="action" value="unbind">
                 <input type="hidden" name="vehicle_id" value="<?= (int)$b['vehicle_id'] ?>">
@@ -114,12 +152,15 @@
       <?php if (!$users): ?>
         <tr><td colspan="6" class="muted">Нет пользователей. Нажмите «+ Добавить» или /seed_admin.php</td></tr>
       <?php endif; ?>
-      <?php foreach ($users as $u): ?>
+      <?php foreach ($users as $u):
+        $uVeh = ($u['vname'] ?? '') . (!empty($u['vplate']) ? ' · '.$u['vplate'] : '');
+        $uBind = $uVeh !== '' ? $uVeh : ($u['zname'] ?? '—');
+      ?>
         <tr>
           <td><?= htmlspecialchars($u['login']) ?></td>
           <td><?= htmlspecialchars($u['name'] ?? '') ?></td>
           <td><?= htmlspecialchars($roleLabels[$u['role']] ?? $u['role']) ?></td>
-          <td><?= htmlspecialchars($u['vname'] ?? $u['zname'] ?? '—') ?></td>
+          <td><?= htmlspecialchars($uBind) ?></td>
           <td><?= (int)$u['is_active'] ? 'да' : 'нет' ?></td>
           <td style="text-align:right;white-space:nowrap">
             <button type="button" class="btn-icon" title="Изменить" onclick='editUser(<?= (int)$u["id"] ?>, <?= json_encode($u["login"], JSON_UNESCAPED_UNICODE) ?>, <?= json_encode((string)($u["name"] ?? ""), JSON_UNESCAPED_UNICODE) ?>, <?= json_encode($u["role"], JSON_UNESCAPED_UNICODE) ?>, <?= (int)($u["vehicle_id"] ?? 0) ?>, <?= (int)($u["zone_id"] ?? 0) ?>, <?= (int)$u["is_active"] ?>)'>✎</button>
