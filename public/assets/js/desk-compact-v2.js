@@ -1,52 +1,33 @@
 /**
- * Компактные подписи + Навигатор + порядок кнопок рейса.
- * Зона: в одном ряду загрузка · машины · заявки
+ * Компактные подписи (только mobile) + Навигатор.
  */
 (function () {
   var IC_SCALE = '<span class="ic ic-scale" aria-hidden="true"></span>';
   var IC_TRUCK = '<span class="ic ic-truck" aria-hidden="true"></span>';
   var IC_BOX = '<span class="ic ic-box" aria-hidden="true"></span>';
-  var NAVI_ICON =
-    '<svg class="navi-ico" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">' +
-    '<path fill="currentColor" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/>' +
-    '</svg>';
+  var NAVI_ICON = '<span class="navi-ico" aria-hidden="true">📍</span>';
   var busy = false;
   var timer = null;
 
+  function isNarrow() {
+    try { return window.matchMedia('(max-width: 900px)').matches; } catch (e) { return window.innerWidth <= 900; }
+  }
+
   function compactZoneCard(card) {
     if (!card || card.getAttribute('data-zone-compact') === '1') return;
-
-    var meta = card.querySelector('.meta');
     var cap = card.querySelector('.zone-cap');
     if (!cap) return;
-
-    var orders = null;
-    if (meta) {
-      var tm = (meta.textContent || '').trim();
-      var mo = tm.match(/(\d+)\s*заявок?/i) || tm.match(/^(\d+)$/);
-      if (mo) orders = mo[1];
-      // убрать отдельную строку «N заявок»
-      meta.style.display = 'none';
-    }
-    // data-order-w на карточке — вес, не количество; число заявок только из meta
-
+    var meta = card.querySelector('.meta');
     var t = (cap.textContent || '').replace(/\s+/g, ' ').trim();
     var load = t.match(/([\d\s]+)\s*\/\s*([\d\s]+)/);
-    var veh = t.match(/машин[аы]?\s*:\s*(\d+)/i);
-    // уже компактный HTML?
-    if (cap.querySelector('.cap-load')) {
-      if (orders != null && !cap.querySelector('.cap-orders')) {
-        var span = document.createElement('span');
-        span.className = 'cap-orders meta-orders';
-        span.title = 'Заявок';
-        span.innerHTML = IC_BOX + orders;
-        cap.appendChild(span);
-      }
-      card.setAttribute('data-zone-compact', '1');
-      return;
+    var veh = t.match(/машин[аы]?\s*:?\s*(\d+)/i);
+    var orders = null;
+    if (meta) {
+      var mt = (meta.textContent || '').replace(/\s+/g, ' ').trim();
+      var om = mt.match(/(\d+)\s*заявок/);
+      if (om) orders = om[1];
     }
     if (!load) return;
-
     var a = load[1].replace(/\s/g, '\u00a0').trim();
     var b = load[2].replace(/\s/g, '\u00a0').trim().replace(/\s*кг$/i, '');
     var html = '<span class="cap-load" title="Загрузка, кг">' + IC_SCALE + a + ' / ' + b + '</span>';
@@ -120,54 +101,24 @@
   function layoutTripTitle(trip) {
     var title = trip.querySelector('.title');
     if (!title) return;
-
-    var nameEl = title.querySelector('.trip-name');
-    if (!nameEl) {
-      var kids = Array.prototype.slice.call(title.childNodes);
-      for (var i = 0; i < kids.length; i++) {
-        var n = kids[i];
-        if (n.nodeType === 1 && n.tagName === 'SPAN' && !n.classList.contains('trip-actions')) {
-          n.classList.add('trip-name');
-          nameEl = n;
-          break;
-        }
-        if (n.nodeType === 3 && n.textContent.trim()) {
-          var sp = document.createElement('span');
-          sp.className = 'trip-name';
-          sp.textContent = n.textContent;
-          title.replaceChild(sp, n);
-          nameEl = sp;
-          break;
-        }
-      }
+    var navi = title.querySelector('.btn-navi, .btn-icon-navi');
+    var toggle = title.querySelector('.trip-toggle');
+    if (navi && toggle && navi.nextSibling !== toggle) {
+      title.appendChild(navi);
+      title.appendChild(toggle);
     }
-
-    var actions = title.querySelector('.trip-actions');
-    if (!actions) {
-      actions = document.createElement('div');
-      actions.className = 'trip-actions';
-      title.appendChild(actions);
-    }
-
-    var toggle = title.querySelector('.trip-toggle') || actions.querySelector('.trip-toggle');
-    var navi = title.querySelector('.btn-navi') || actions.querySelector('.btn-navi');
-    if (navi && navi.parentNode !== actions) actions.appendChild(navi);
-    if (toggle && toggle.parentNode !== actions) actions.appendChild(toggle);
-    if (navi) actions.appendChild(navi);
-    if (toggle) actions.appendChild(toggle);
   }
 
   function addNaviButtons() {
     document.querySelectorAll('.trip').forEach(function (trip) {
       var title = trip.querySelector('.title');
       if (!title) return;
-
-      if (!trip.querySelector('.btn-navi')) {
+      if (!trip.querySelector('.btn-navi, .btn-icon-navi')) {
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'btn btn-primary btn-navi btn-icon-navi';
         btn.innerHTML = NAVI_ICON;
-        btn.title = 'Открыть в Яндекс Навигаторе';
+        btn.title = 'Маршрут всех точек рейса в Яндекс Навигаторе';
         btn.setAttribute('aria-label', 'Навигатор');
         btn.addEventListener('click', function (e) {
           e.preventDefault();
@@ -184,14 +135,6 @@
           }, 700);
         });
         title.appendChild(btn);
-      } else {
-        var existing = trip.querySelector('.btn-navi');
-        if (existing && !existing.querySelector('.navi-ico')) {
-          existing.classList.add('btn-icon-navi');
-          existing.innerHTML = NAVI_ICON;
-          existing.title = 'Открыть в Яндекс Навигаторе';
-          existing.setAttribute('aria-label', 'Навигатор');
-        }
       }
       layoutTripTitle(trip);
     });
@@ -201,13 +144,14 @@
     if (busy) return;
     busy = true;
     try {
+      if (!isNarrow()) {
+        addNaviButtons();
+        return;
+      }
       document.querySelectorAll('.zone-card').forEach(function (card) {
-        // после DnD refreshZone сбрасывает HTML — снимаем флаг
         var cap = card.querySelector('.zone-cap');
         if (cap && !cap.querySelector('.cap-load') && card.getAttribute('data-zone-compact') === '1') {
           card.removeAttribute('data-zone-compact');
-          var meta = card.querySelector('.meta');
-          if (meta) meta.style.display = '';
         }
         compactZoneCard(card);
       });
@@ -227,7 +171,8 @@
     run();
     document.addEventListener('mouseup', schedule);
     document.addEventListener('touchend', schedule);
-    setInterval(run, 3000);
+    window.addEventListener('resize', schedule);
+    setInterval(run, 4000);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
