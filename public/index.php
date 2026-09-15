@@ -8,17 +8,16 @@ require __DIR__ . '/desk_logic.php';
 $view = __DIR__ . '/desk_view.php';
 
 if (!is_file($view) || filesize($view) < 10000) {
-    $b64 = '';
-    foreach (['desk_view_b64_0.txt', 'desk_view_b64_1.txt'] as $f) {
-        $p = __DIR__ . '/' . $f;
-        if (!is_file($p)) {
-            http_response_code(500);
-            header('Content-Type: text/plain; charset=utf-8');
-            echo "Нет $f — дождитесь деплоя.\n";
-            exit;
-        }
-        $b64 .= preg_replace('/\s+/', '', file_get_contents($p));
+    $p0 = __DIR__ . '/desk_view_b64_0.php';
+    $p1 = __DIR__ . '/desk_view_b64_1.php';
+    if (!is_file($p0) || !is_file($p1)) {
+        http_response_code(500);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo "Нет desk_view_b64_0.php / desk_view_b64_1.php\n";
+        exit;
     }
+    $b64 = (string) require $p0;
+    $b64 .= (string) require $p1;
     $gz = base64_decode($b64, true);
     if ($gz === false) {
         http_response_code(500);
