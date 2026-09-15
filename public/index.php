@@ -4,29 +4,4 @@ if (class_exists('Auth')) {
     Auth::requireLogin('login.php');
 }
 require __DIR__ . '/desk_logic.php';
-
-$view = __DIR__ . '/desk_view.php';
-
-if (!is_file($view) || filesize($view) < 5000) {
-    $b64 = '';
-    for ($i = 0; $i <= 10; $i++) {
-        $f = __DIR__ . '/view_chunk_' . $i . '.php';
-        if (!is_file($f)) break;
-        $b64 .= (string) require $f;
-    }
-    if ($b64 !== '') {
-        $gz = base64_decode($b64, true);
-        $raw = ($gz !== false) ? @gzdecode($gz) : false;
-        if ($raw !== false && strlen($raw) > 5000) {
-            file_put_contents($view, $raw);
-        }
-    }
-}
-
-if (!is_file($view) || filesize($view) < 1000) {
-    http_response_code(500);
-    header('Content-Type: text/plain; charset=utf-8');
-    echo "Нужен файл desk_view.php\n";
-    exit;
-}
-require $view;
+require __DIR__ . '/desk_view.php';
