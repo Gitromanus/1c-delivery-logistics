@@ -1,4 +1,4 @@
-/** live.js v12 — zone yellow bar when load without vehicles */
+/** live.js v13 — restore zone stats; fmtKg without spaces */
 (function () {
   function loadScript(id, src) {
     if (document.getElementById(id)) return;
@@ -7,7 +7,7 @@
     s.src = src;
     document.head.appendChild(s);
   }
-  loadScript('desk-compact-v2', 'assets/js/desk-compact-v2.js?v=9');
+  loadScript('desk-compact-v2', 'assets/js/desk-compact-v2.js?v=10');
   loadScript('map-markers', 'assets/js/map-markers.js?v=4');
 
   var THEME_KEY = 'logistics-theme';
@@ -67,7 +67,7 @@
   }
 
   function fmtKg(n) {
-    return Math.round(Number(n) || 0).toLocaleString('ru-RU');
+    return String(Math.round(Number(n) || 0));
   }
 
   function updateZoneStats() {
@@ -88,8 +88,8 @@
           var meta = card.querySelector('.meta');
           if (meta) {
             meta.textContent = cnt + ' заявок · ' + fmtKg(w) + ' кг';
-            meta.removeAttribute('data-compact');
             meta.style.display = '';
+            meta.removeAttribute('data-compact');
           }
 
           var totCap = 0;
@@ -116,10 +116,10 @@
 
           var cap = card.querySelector('.zone-cap');
           if (cap) {
+            card.removeAttribute('data-zone-compact');
+            cap.removeAttribute('data-compact');
             cap.textContent =
               'Загружено: ' + fmtKg(w) + ' / ' + fmtKg(totCap) + ' кг · машин: ' + nVeh;
-            cap.removeAttribute('data-compact');
-            card.removeAttribute('data-zone-compact');
           }
 
           var badge = card.querySelector('.badge-corner');
@@ -170,7 +170,7 @@
             ch.innerHTML = '<span class="veh-name"></span><span class="veh-cap"></span>';
             ch.querySelector('.veh-name').textContent = v.name;
             ch.querySelector('.veh-cap').textContent =
-              Math.round(v.capacity_kg).toLocaleString('ru-RU') + ' кг';
+              Math.round(v.capacity_kg) + ' кг';
           }
           ch.setAttribute('data-zone-id', zid);
           box.appendChild(ch);
