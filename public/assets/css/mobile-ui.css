@@ -1,0 +1,118 @@
+/* --- mobile unassigned + panels: no horizontal overflow --- */
+.grid, .panel, .map-panel, #unassignedZone, .zone-card, .trip {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+#unassignedZone {
+  overflow-x: hidden;
+  width: 100%;
+}
+.drag-order {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.drag-order .ord-body {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.drag-order .ord-num {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drag-order .ord-addr,
+.drag-order .ord-partner {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drag-order .ord-partner { color: #b6bcc6; font-weight: 500; margin-top: 1px; }
+.drag-order .ord-kg {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--chip-bg, #2b3245);
+  color: var(--text, #dfe3ea);
+  border-radius: 20px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+@media (max-width: 1000px) {
+  #unassignedZone {
+    grid-template-columns: 1fr !important;
+  }
+  .header .toolbar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .header .toolbar .btn,
+  .header .toolbar a.btn {
+    font-size: 0.85rem;
+    padding: 8px 10px;
+  }
+  .map-box { height: 40vh; min-height: 240px; }
+  .panel { padding: 12px; }
+}
+
+/* --- admin mobile: larger touch targets --- */
+@media (max-width: 700px) {
+  .admin-nav {
+    gap: 8px;
+  }
+  .admin-nav a.btn,
+  .admin-nav .btn {
+    font-size: 15px !important;
+    padding: 10px 14px !important;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .panel-head h2,
+  .panel h2 {
+    font-size: 1.05rem;
+  }
+  table {
+    font-size: 0.95rem;
+  }
+  th, td {
+    padding: 10px 8px;
+  }
+  .btn, .btn-sm {
+    min-height: 40px;
+    font-size: 14px;
+    padding: 8px 12px;
+  }
+  .btn-icon, .btn-del {
+    font-size: 1.15rem;
+    padding: 8px 10px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .modal {
+    max-width: 100%;
+    margin: 0 8px;
+    padding: 16px;
+  }
+  .modal input, .modal select {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  .app {
+    padding: 12px 10px 40px;
+  }
+}
