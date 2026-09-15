@@ -1,4 +1,4 @@
-<?php /* compact desk — без внешних загрузок */ ?>
+<?php /* compact desk */ ?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -9,7 +9,7 @@
 <?php if ($yandexKey !== ''): ?>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=<?= h($yandexKey) ?>&lang=ru_RU"></script>
 <?php endif; ?>
-<script src="assets/js/live.js?v=13" defer></script>
+<script src="assets/js/live.js?v=14" defer></script>
 <script src="assets/js/desk-compact-v2.js?v=10" defer></script>
 <script src="assets/js/map-markers.js?v=4" defer></script>
 </head>
@@ -62,7 +62,7 @@
 <section class="panel map-panel">
   <h2>Карта</h2>
   <?php if($yandexKey===''): ?>
-  <p class="muted">Нет yandex_maps_key</p>
+  <p class="muted">Укажите ключ Яндекс.Карт в <a href="admin/settings.php">Настройках API</a> или config.php</p>
   <?php else: ?>
   <div id="map" class="map-box"></div>
   <?php endif; ?>
@@ -126,6 +126,7 @@ const needGeo = <?= json_encode($needGeo, JSON_UNESCAPED_UNICODE) ?>;
 const zonePolys = <?= json_encode(array_map(function($p){
   return ['zone_id'=>(int)$p['zone_id'],'zone_name'=>$p['zone_name'],'color'=>(string)($p['color']??''),'points'=>json_decode((string)$p['polygon'],true)?:[]];
 }, $zonePolys), JSON_UNESCAPED_UNICODE) ?>;
+
 document.querySelectorAll('.trip-toggle').forEach(function(btn){
   btn.addEventListener('click', function(){ btn.closest('.trip').classList.toggle('collapsed'); });
 });
@@ -135,6 +136,54 @@ if(rb) rb.addEventListener('click', async function(){
   try{ await fetch('api/rebuild.php?date=<?=urlencode($date)?>',{method:'POST'}); location.reload(); }
   catch(e){ alert(e.message); rb.disabled=false; rb.textContent='Пересобрать'; }
 });
+
+// Инициализация карты Яндекс
+function drawZones(map) {
+  if (!zonePolys || !zonePolys.length) return;
+  zonePolys.forEach(function (z) {
+    if (!z.points || z.points.length < 3) return;
+    try {
+      var poly = new ymaps.Polygon([z.points], { hintContent: z.zone_name || '' }, {
+        fillColor: (z.color || '#1a73e8') + '33',
+        strokeColor: z.color || '#1a73e8',
+        strokeWidth: 2
+      });
+      map.geoObjects.add(poly);
+    } catch (e) {}
+  });
+}
+function addMarks(map, points) {
+  if (!points) return;
+  points.forEach(function (p) {
+    if (p.lat == null || p.lon == null || p.lat === '' || p.lon === '') return;
+    var lat = Number(p.lat), lon = Number(p.lon);
+    if (isNaN(lat) || isNaN(lon)) return;
+    try {
+      var preset = p.status === 'new' ? 'islands#orangeCircleIcon' : 'islands#blueCircleIcon';
+      var pm = new ymaps.Placemark([lat, lon], {
+        balloonContentHeader: p.number || p.external_id || '',
+        balloonContentBody: (p.address || '') + (p.partner ? '<br>' + p.partner : ''),
+        iconContent: ''
+      }, { preset: preset });
+      map.geoObjects.add(pm);
+    } catch (e) {}
+  });
+}
+if (typeof ymaps !== 'undefined' && document.getElementById('map')) {
+  ymaps.ready(function () {
+    var map = new ymaps.Map('map', {
+      center: [47.411, 40.091],
+      zoom: 10,
+      controls: ['zoomControl', 'typeSelector']
+    });
+    window.__logisticsMap = map;
+    drawZones(map);
+    addMarks(map, mapPoints);
+    if (typeof window.refreshOrderMarks === 'function') {
+      try { window.refreshOrderMarks(map); } catch (e) {}
+    }
+  });
+}
 </script>
 </body>
 </html>
