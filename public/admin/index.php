@@ -1,4 +1,8 @@
 <?php
+require dirname(__DIR__) . '/bootstrap.php';
+if (class_exists('Auth')) {
+    Auth::requireAdmin('../login.php');
+}
 $cache = __DIR__ . '/admin_app.full.php';
 
 if (!is_file($cache) || filesize($cache) < 5000) {
@@ -49,5 +53,17 @@ if (stripos($html, '</body>') !== false) {
     $changed = true;
 }
 
-if ($changed) file_put_contents($cache, $html);
+if (strpos($html, 'users.php') === false) {
+    $nav = '<div class="admin-nav" style="margin:8px 0 16px;display:flex;gap:12px;flex-wrap:wrap">'
+         . '<a href="users.php">Пользователи</a>'
+         . '<a href="settings.php">Настройки API</a>'
+         . '<a href="../index.php">Рабочий стол</a>'
+         . '<a href="../logout.php">Выйти</a></div>';
+    $html = preg_replace('#(<body[^>]*>)#i', '$1' . $nav, $html, 1);
+    $changed = true;
+}
+
+if ($changed) {
+    file_put_contents($cache, $html);
+}
 require $cache;
