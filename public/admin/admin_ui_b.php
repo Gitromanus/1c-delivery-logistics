@@ -40,13 +40,31 @@
 </div>
 <div class="modal-overlay" id="bindModal" onclick="if(event.target===this)closeModal('bindModal')">
   <form method="post" class="modal" onsubmit="closeModal('bindModal')">
-    <h3>Привязать машину к зоне</h3>
-    <input type="hidden" name="action" value="bind">
-    <label>Машина</label><select name="vehicle_id" id="bindVehicle"><?php foreach ($vehicles as $v): ?><option value="<?= (int)$v['id'] ?>"><?= htmlspecialchars($v['name']) ?></option><?php endforeach; ?></select>
-    <label>Зона</label><select name="zone_id" id="bindZone"><?php foreach ($zones as $z): ?><option value="<?= (int)$z['id'] ?>"><?= htmlspecialchars($z['name']) ?></option><?php endforeach; ?></select>
-    <label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input type="checkbox" name="is_primary" value="1" checked> Основная зона</label>
-    <div class="modal-actions"><button class="btn btn-ghost" type="button" onclick="closeModal('bindModal')">Отмена</button>
-    <button class="btn btn-primary" type="submit">Привязать</button></div>
+    <h3 id="bindModalTitle">Привязать машину к зоне</h3>
+    <input type="hidden" name="action" id="bindAction" value="bind">
+    <input type="hidden" name="old_vehicle_id" id="bindOldV" value="">
+    <input type="hidden" name="old_zone_id" id="bindOldZ" value="">
+    <label>Машина</label>
+    <select name="vehicle_id" id="bindVehicle">
+      <?php foreach ($vehicles as $v):
+        $opt = $v['name'] . (!empty($v['plate']) ? ' · '.$v['plate'] : '');
+      ?>
+        <option value="<?= (int)$v['id'] ?>"><?= htmlspecialchars($opt) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <label>Зона</label>
+    <select name="zone_id" id="bindZone">
+      <?php foreach ($zones as $z): ?>
+        <option value="<?= (int)$z['id'] ?>"><?= htmlspecialchars($z['name']) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px">
+      <input type="checkbox" name="is_primary" id="bindPrimary" value="1" checked> Основная зона
+    </label>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" type="button" onclick="closeModal('bindModal')">Отмена</button>
+      <button class="btn btn-primary" type="submit" id="bindModalSubmit">Привязать</button>
+    </div>
   </form>
 </div>
 <div class="modal-overlay" id="userModal" onclick="if(event.target===this)closeModal('userModal')">
@@ -65,12 +83,20 @@
       <option value="admin">Админ</option>
     </select>
     <label id="userVehLabel">Машина (водитель)</label>
-    <select name="vehicle_id" id="userVehicle"><option value="">—</option>
-      <?php foreach ($vehicles as $v): ?><option value="<?= (int)$v['id'] ?>"><?= htmlspecialchars($v['name']) ?></option><?php endforeach; ?>
+    <select name="vehicle_id" id="userVehicle">
+      <option value="">—</option>
+      <?php foreach ($vehicles as $v):
+        $opt = $v['name'] . (!empty($v['plate']) ? ' · '.$v['plate'] : '');
+      ?>
+        <option value="<?= (int)$v['id'] ?>"><?= htmlspecialchars($opt) ?></option>
+      <?php endforeach; ?>
     </select>
     <label id="userZoneLabel">Зона (торговый)</label>
-    <select name="zone_id" id="userZone"><option value="">—</option>
-      <?php foreach ($zones as $z): ?><option value="<?= (int)$z['id'] ?>"><?= htmlspecialchars($z['name']) ?></option><?php endforeach; ?>
+    <select name="zone_id" id="userZone">
+      <option value="">—</option>
+      <?php foreach ($zones as $z): ?>
+        <option value="<?= (int)$z['id'] ?>"><?= htmlspecialchars($z['name']) ?></option>
+      <?php endforeach; ?>
     </select>
     <label id="userActiveLabel" style="display:none;align-items:center;gap:8px;margin-top:12px">
       <input type="checkbox" name="is_active" id="userActive" value="1" checked> Активен
@@ -86,7 +112,26 @@ function openZoneAdd(){document.getElementById('zoneAction').value='add_zone';do
 function editZone(id,name,code,sort){document.getElementById('zoneAction').value='edit_zone';document.getElementById('zoneId').value=id;document.getElementById('zoneName').value=name;document.getElementById('zoneCode').value=code||'';document.getElementById('zoneSort').value=sort;document.getElementById('zoneModalTitle').textContent='Изменить зону';document.getElementById('zoneModalSubmit').textContent='Сохранить';openModal('zoneModal');}
 function openVehicleAdd(){document.getElementById('vehicleAction').value='add_vehicle';document.getElementById('vehicleId').value='';document.getElementById('vehicleName').value='';document.getElementById('vehiclePlate').value='';document.getElementById('vehicleCap').value='900';document.getElementById('vehicleModalTitle').textContent='Добавить машину';document.getElementById('vehicleModalSubmit').textContent='Добавить';openModal('vehicleModal');}
 function editVehicle(id,name,plate,cap){document.getElementById('vehicleAction').value='edit_vehicle';document.getElementById('vehicleId').value=id;document.getElementById('vehicleName').value=name;document.getElementById('vehiclePlate').value=plate||'';document.getElementById('vehicleCap').value=cap;document.getElementById('vehicleModalTitle').textContent='Изменить машину';document.getElementById('vehicleModalSubmit').textContent='Сохранить';openModal('vehicleModal');}
-function openBindAdd(){openModal('bindModal');}
+function openBindAdd(){
+  document.getElementById('bindAction').value='bind';
+  document.getElementById('bindOldV').value='';
+  document.getElementById('bindOldZ').value='';
+  document.getElementById('bindPrimary').checked=true;
+  document.getElementById('bindModalTitle').textContent='Привязать машину к зоне';
+  document.getElementById('bindModalSubmit').textContent='Привязать';
+  openModal('bindModal');
+}
+function editBind(vid, zid, primary){
+  document.getElementById('bindAction').value='rebind';
+  document.getElementById('bindOldV').value=vid;
+  document.getElementById('bindOldZ').value=zid;
+  document.getElementById('bindVehicle').value=String(vid);
+  document.getElementById('bindZone').value=String(zid);
+  document.getElementById('bindPrimary').checked=!!primary;
+  document.getElementById('bindModalTitle').textContent='Изменить привязку';
+  document.getElementById('bindModalSubmit').textContent='Сохранить';
+  openModal('bindModal');
+}
 function toggleUserRoleFields(){var r=document.getElementById('userRole').value;document.getElementById('userVehLabel').style.display=r==='driver'?'':'none';document.getElementById('userVehicle').style.display=r==='driver'?'':'none';document.getElementById('userZoneLabel').style.display=r==='sales'?'':'none';document.getElementById('userZone').style.display=r==='sales'?'':'none';}
 function openUserAdd(){document.getElementById('userAction').value='add_user';document.getElementById('userId').value='';document.getElementById('userLogin').value='';document.getElementById('userLogin').readOnly=false;document.getElementById('userPass').value='';document.getElementById('userPass').required=true;document.getElementById('userPassHint').textContent='';document.getElementById('userName').value='';document.getElementById('userRole').value='dispatcher';document.getElementById('userVehicle').value='';document.getElementById('userZone').value='';document.getElementById('userActiveLabel').style.display='none';document.getElementById('userModalTitle').textContent='Добавить пользователя';document.getElementById('userModalSubmit').textContent='Добавить';toggleUserRoleFields();openModal('userModal');}
 function editUser(id,login,name,role,vid,zid,active){document.getElementById('userAction').value='edit_user';document.getElementById('userId').value=id;document.getElementById('userLogin').value=login;document.getElementById('userLogin').readOnly=true;document.getElementById('userPass').value='';document.getElementById('userPass').required=false;document.getElementById('userPassHint').textContent='(пусто = не менять)';document.getElementById('userName').value=name||'';document.getElementById('userRole').value=role;document.getElementById('userVehicle').value=vid||'';document.getElementById('userZone').value=zid||'';document.getElementById('userActive').checked=!!active;document.getElementById('userActiveLabel').style.display='flex';document.getElementById('userModalTitle').textContent='Изменить пользователя';document.getElementById('userModalSubmit').textContent='Сохранить';toggleUserRoleFields();openModal('userModal');}
