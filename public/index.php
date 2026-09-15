@@ -5,17 +5,28 @@ if (class_exists('Auth')) {
 }
 require __DIR__ . '/desk_logic.php';
 
-// HTML-часть: если есть desk_view.php — из него, иначе встроенный минимальный редирект
-if (is_file(__DIR__ . '/desk_view.php')) {
-    require __DIR__ . '/desk_view.php';
-    exit;
+$view = __DIR__ . '/desk_view.php';
+if (!is_file($view) || filesize($view) < 2000) {
+    $b64 = '';
+    foreach (['desk_view_0.b64', 'desk_view_1.b64', 'desk_view_2.b64'] as $f) {
+        $p = __DIR__ . '/' . $f;
+        if (is_file($p)) {
+            $b64 .= file_get_contents($p);
+        }
+    }
+    if ($b64 !== '') {
+        $decoded = base64_decode($b64, true);
+        if ($decoded !== false) {
+            file_put_contents($view, $decoded);
+        }
+    }
 }
 
-// Fallback: старый index через desk_app
-if (is_file(__DIR__ . '/desk_app.php')) {
-    require __DIR__ . '/desk_app.php';
+if (is_file($view)) {
+    require $view;
     exit;
 }
 
 http_response_code(500);
-echo 'Залейте desk_view.php (HTML рабочего стола).';
+header('Content-Type: text/plain; charset=utf-8');
+echo "Нет desk_view.php. Залейте public/desk_view_*.b64 или desk_view.php\n";
