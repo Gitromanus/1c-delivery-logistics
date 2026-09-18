@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Логистика доставки</title>
-<link rel="stylesheet" href="assets/css/style.css?v=13">
+<link rel="stylesheet" href="assets/css/style.css?v=14">
 <link rel="stylesheet" href="assets/css/mobile-ui.css?v=2">
 <?php if ($yandexKey !== ''): ?>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=<?= h($yandexKey) ?>&lang=ru_RU"></script>
@@ -122,10 +122,10 @@
     </div>
     <div class="trip-body">
       <div class="orders-list" style="margin-top:8px">
-        <?php foreach($list as $o): ?>
-        <div class="drag-order" data-order-id="<?=(int)$o['id']?>" data-from-trip="<?=(int)$t['id']?>" data-weight="<?=(float)$o['weight_kg']?>">
+        <?php foreach($list as $o): $isNewRoute = ($o['tpl_pos'] === null); ?>
+        <div class="drag-order<?=$isNewRoute?' route-new':''?>" data-order-id="<?=(int)$o['id']?>" data-from-trip="<?=(int)$t['id']?>" data-weight="<?=(float)$o['weight_kg']?>"<?=$isNewRoute?' title="Клиента ещё нет в сохранённом порядке маршрута — перетащите в нужное место"':''?>>
           <div class="ord-body">
-            <div class="ord-num"><?=h($o['number']?:$o['external_id'])?></div>
+            <div class="ord-num"><?=h($o['number']?:$o['external_id'])?><?php if($isNewRoute): ?> <span class="ord-new-badge">новый</span><?php endif; ?></div>
             <div class="ord-addr"><?=h($o['address'])?></div>
             <?php if (!empty($o['partner'])): ?>
             <div class="ord-partner"><?=h($o['partner'])?></div>

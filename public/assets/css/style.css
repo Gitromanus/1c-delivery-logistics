@@ -330,6 +330,23 @@ code { color: var(--accent); font-size: 0.85em; }
   background: var(--chip-bg) !important; color: var(--text) !important;
 }
 
+/* Заявка, чей клиент ещё не в сохранённом порядке маршрута (шаблоне зоны) */
+.drag-order.route-new {
+  border: 1px dashed #e8710a !important;
+  border-left: 4px solid #e8710a !important;
+  background: rgba(232, 113, 10, 0.08) !important;
+}
+[data-theme="light"] .drag-order.route-new {
+  background: #fff4e5 !important;
+}
+.ord-new-badge {
+  display: inline-block; margin-left: 6px;
+  font-size: 10px; font-weight: 700; line-height: 1;
+  padding: 2px 6px; border-radius: 999px;
+  color: #fff; background: #e8710a;
+  vertical-align: 1px; text-transform: lowercase;
+}
+
 .meta-orders {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 0.85rem; color: var(--muted); font-weight: 600;

@@ -81,9 +81,11 @@ if ($trips) {
     $ids = array_column($trips, 'id');
     $in = implode(',', array_map('intval', $ids));
     $items = $pdo->query(
-        "SELECT ti.trip_id, o.*
+        "SELECT ti.trip_id, o.*, rt.position AS tpl_pos
          FROM trip_items ti
          JOIN orders o ON o.id = ti.order_id
+         JOIN trips t ON t.id = ti.trip_id
+         LEFT JOIN route_templates rt ON rt.zone_id = t.zone_id AND rt.partner = o.partner
          WHERE ti.trip_id IN ($in)
          ORDER BY ti.sort_order, o.id"
     )->fetchAll();
