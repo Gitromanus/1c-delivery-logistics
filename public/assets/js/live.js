@@ -191,7 +191,11 @@
           var box = document.querySelector('.zone-card[data-zone-drop="' + zid + '"] .zone-vehicles');
           if (!box) return;
           var ch = chips[vid];
-          if (!ch) {
+          if (ch) {
+            // Машина может везти несколько зон (объединённый рейс) —
+            // клонируем чип вместо перемещения одного и того же элемента.
+            ch = ch.cloneNode(true);
+          } else {
             ch = document.createElement('div');
             ch.className = 'veh-chip';
             ch.setAttribute('data-vehicle-id', vid);
