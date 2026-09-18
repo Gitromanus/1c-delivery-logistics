@@ -18,7 +18,7 @@ class DeskVehicles
         $seenPair = [];
 
         $st = $pdo->prepare(
-            "SELECT t.id AS trip_id, t.zone_id, t.note, v.id AS vehicle_id, v.name, v.capacity_kg
+            "SELECT t.id AS trip_id, t.zone_id, t.note, v.id AS vehicle_id, v.name, v.plate, v.capacity_kg
              FROM trips t
              JOIN vehicles v ON v.id = t.vehicle_id
              WHERE t.trip_date = ? AND t.status <> 'cancelled' AND v.is_active = 1
@@ -76,6 +76,7 @@ class DeskVehicles
                     'zone_id' => $zid,
                     'vehicle_id' => $vid,
                     'name' => $vr['name'],
+                    'plate' => $vr['plate'],
                     'capacity_kg' => $vr['capacity_kg'],
                     'empty' => !$loaded,
                     'merged' => $merged,
@@ -107,6 +108,7 @@ class DeskVehicles
                     'zone_id' => (int) $vr['zone_id'],
                     'vehicle_id' => $vid,
                     'name' => $vr['name'],
+                    'plate' => $vr['plate'],
                     'capacity_kg' => $vr['capacity_kg'],
                     'empty' => false,
                     'merged' => false,

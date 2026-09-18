@@ -10,18 +10,6 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
     $date = date('Y-m-d');
 }
 
-// Временная диагностика: ?diag=1 — какой src/DeskVehicles.php реально на сервере
-if (isset($_GET['diag'])) {
-    $f = dirname(__DIR__) . '/src/DeskVehicles.php';
-    header('Content-Type: text/plain; charset=utf-8');
-    echo 'file_exists=' . var_export(is_file($f), true) . "\n";
-    echo 'md5=' . (is_file($f) ? md5_file($f) : '-') . "\n";
-    echo 'has_v2=' . (is_file($f) ? var_export(strpos((string) file_get_contents($f), 'v2 (2026-09-18)') !== false, true) : '-') . "\n";
-    echo 'loaded=' . var_export(class_exists('DeskVehicles'), true) . "\n";
-    echo 'refl=' . (class_exists('DeskVehicles') ? (new ReflectionClass('DeskVehicles'))->getFileName() : '-') . "\n";
-    exit;
-}
-
 $pdo = Database::pdo();
 $vehByZone = class_exists('DeskVehicles')
     ? DeskVehicles::byZoneForDate($pdo, $date)
@@ -35,6 +23,7 @@ foreach ($vehByZone as $zid => $list) {
             'zone_id' => (int) $zid,
             'vehicle_id' => (int) $v['vehicle_id'],
             'name' => $v['name'],
+            'plate' => (string) ($v['plate'] ?? ''),
             'capacity_kg' => (float) $v['capacity_kg'],
         ];
     }

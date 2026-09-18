@@ -203,6 +203,17 @@
             ch.querySelector('.veh-name').textContent = v.name;
           }
           ch.querySelector('.veh-name').textContent = v.name;
+          var pl = ch.querySelector('.veh-plate');
+          if (v.plate) {
+            if (!pl) {
+              pl = document.createElement('span');
+              pl.className = 'veh-plate';
+              ch.insertBefore(pl, ch.querySelector('.veh-cap'));
+            }
+            pl.textContent = v.plate;
+          } else if (pl) {
+            pl.remove();
+          }
           ch.querySelector('.veh-cap').textContent =
             Math.round(v.capacity_kg) + ' \u043A\u0433';
           // Состояния: объединённый рейс / пустой рейс (не прибавляет вместимость)
