@@ -107,29 +107,11 @@ foreach ($vehZoneRows as $vr) {
     $vehByZone[(int) $vr['zone_id']][] = $vr;
 }
 
-// Зоны, которые сегодня фактически обслуживают рейсы (в т.ч. объединённые):
-// показываем на карточке зоны те машины, которые реально везут её заявки,
-// а не статичные привязки из админки.
-$tripVehByZone = [];
-foreach ($trips as $t) {
-    $zonesCovered = [];
-    if (!empty($t['zone_id'])) {
-        $zonesCovered[(int) $t['zone_id']] = true;
-    }
-    foreach ($itemsByTrip[(int) $t['id']] ?? [] as $it) {
-        if (!empty($it['zone_id'])) {
-            $zonesCovered[(int) $it['zone_id']] = true;
-        }
-    }
-    foreach (array_keys($zonesCovered) as $zid) {
-        $tripVehByZone[$zid][(int) $t['vehicle_id']] = [
-            'zone_id' => $zid,
-            'vehicle_id' => (int) $t['vehicle_id'],
-            'name' => $t['vehicle_name'],
-            'capacity_kg' => $t['capacity_kg'],
-        ];
-    }
-}
+// Машины по зонам: рейсы дня (включая объединённые, с пометками
+// merged/empty) перекрывают статичные привязки из админки.
+$tripVehByZone = class_exists('DeskVehicles')
+    ? DeskVehicles::byZoneForDate($pdo, $date)
+    : [];
 foreach ($tripVehByZone as $zid => $vehList) {
     $vehByZone[$zid] = array_values($vehList);
 }

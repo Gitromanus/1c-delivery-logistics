@@ -89,7 +89,8 @@
           card.querySelectorAll('.veh-chip[data-cap]').forEach(function (ch) {
             totCap += parseFloat(ch.getAttribute('data-cap')) || 0;
           });
-          var nVeh = card.querySelectorAll('.veh-chip[data-vehicle-id]').length;
+          // «Машин» считаем только везущие (пустые рейсы вместимость не дают)
+          var nVeh = card.querySelectorAll('.veh-chip[data-cap]').length;
           var noVeh = nVeh === 0 && w > 0.01;
 
           var bar = card.querySelector('.bar');
@@ -198,14 +199,34 @@
           } else {
             ch = document.createElement('div');
             ch.className = 'veh-chip';
-            ch.setAttribute('data-vehicle-id', vid);
-            ch.setAttribute('data-cap', v.capacity_kg);
-            ch.title = '\u041F\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u0435 \u0432 \u0434\u0440\u0443\u0433\u0443\u044E \u0437\u043E\u043D\u0443';
             ch.innerHTML = '<span class="veh-name"></span><span class="veh-cap"></span>';
             ch.querySelector('.veh-name').textContent = v.name;
-            ch.querySelector('.veh-cap').textContent =
-              Math.round(v.capacity_kg) + ' \u043A\u0433';
           }
+          ch.querySelector('.veh-name').textContent = v.name;
+          ch.querySelector('.veh-cap').textContent =
+            Math.round(v.capacity_kg) + ' \u043A\u0433';
+          // Состояния: объединённый рейс / пустой рейс (не прибавляет вместимость)
+          ch.setAttribute('data-vehicle-id', vid);
+          ch.className = 'veh-chip' + (v.empty ? ' chip-empty' : '') + (v.merged ? ' chip-merged' : '');
+          if (v.empty) {
+            ch.removeAttribute('data-cap');
+          } else {
+            ch.setAttribute('data-cap', v.capacity_kg);
+          }
+          var tag = ch.querySelector('.veh-tag');
+          if (v.merged && !tag) {
+            tag = document.createElement('span');
+            tag.className = 'veh-tag';
+            tag.textContent = '\u043E\u0431\u044A\u0435\u0434.';
+            ch.insertBefore(tag, ch.querySelector('.veh-cap'));
+          } else if (!v.merged && tag) {
+            tag.remove();
+          }
+          ch.title = v.merged
+            ? (v.note || '\u041E\u0431\u044A\u0435\u0434\u0438\u043D\u0451\u043D\u043D\u044B\u0439 \u0440\u0435\u0439\u0441: \u043C\u0430\u0448\u0438\u043D\u0430 \u0432\u0435\u0437\u0451\u0442 \u043D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0440\u0430\u0439\u043E\u043D\u043E\u0432')
+            : (v.empty
+              ? '\u041F\u0443\u0441\u0442\u043E\u0439 \u0440\u0435\u0439\u0441 \u2014 \u043C\u0430\u0448\u0438\u043D\u0430 \u0437\u0430\u043A\u0440\u0435\u043F\u043B\u0435\u043D\u0430 \u0437\u0430 \u0437\u043E\u043D\u043E\u0439, \u0437\u0430\u044F\u0432\u043E\u043A \u043F\u043E\u043A\u0430 \u043D\u0435\u0442'
+              : '\u041F\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u0435 \u0432 \u0434\u0440\u0443\u0433\u0443\u044E \u0437\u043E\u043D\u0443');
           ch.setAttribute('data-zone-id', zid);
           box.appendChild(ch);
         });

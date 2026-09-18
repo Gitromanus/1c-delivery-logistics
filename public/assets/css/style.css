@@ -138,6 +138,13 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 }
 .veh-chip:hover { border-color: var(--accent); }
 .veh-chip .veh-cap { color: var(--muted); font-weight: 600; }
+.veh-chip.chip-merged { border-left: 3px solid #e8710a; }
+.veh-chip.chip-empty { opacity: .55; border-style: dashed; }
+.veh-tag {
+  font-size: 9px; font-weight: 700; line-height: 1;
+  color: #e8710a; background: rgba(232,113,10,.14);
+  border-radius: 999px; padding: 2px 5px;
+}
 [data-zone-drop].drag-over { outline: 2px dashed var(--accent); outline-offset: -2px; }
 
 .dd-ghost {

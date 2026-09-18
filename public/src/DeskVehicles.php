@@ -2,13 +2,14 @@
 
 /**
  * Машины в зонах на выбранную дату (из рейсов), без поломки истории.
- * Объединённый рейс «покрывает» все зоны своих заявок: его машина
- * показывается на карточке каждой такой зоны.
+ * Объединённый рейс «покрывает» все зоны своих заявок — его машина
+ * показывается на карточке каждой зоны (с пометкой merged).
+ * Пустые рейсы (без заявок) помечаются empty и вместимость зоны не увеличивают.
  */
 class DeskVehicles
 {
     /**
-     * @return array<int, list<array{zone_id:int,vehicle_id:int,name:string,capacity_kg:float|string}>>
+     * @return array<int, list<array{zone_id:int,vehicle_id:int,name:string,capacity_kg:float|string,empty:bool,merged:bool,note:?string}>>
      */
     public static function byZoneForDate(PDO $pdo, string $date): array
     {
@@ -16,7 +17,7 @@ class DeskVehicles
         $seenPair = [];
 
         $st = $pdo->prepare(
-            "SELECT t.id AS trip_id, t.zone_id, v.id AS vehicle_id, v.name, v.capacity_kg
+            "SELECT t.id AS trip_id, t.zone_id, t.note, v.id AS vehicle_id, v.name, v.capacity_kg
              FROM trips t
              JOIN vehicles v ON v.id = t.vehicle_id
              WHERE t.trip_date = ? AND t.status <> 'cancelled' AND v.is_active = 1
@@ -43,24 +44,41 @@ class DeskVehicles
         foreach ($trips as $vr) {
             $vid = (int) $vr['vehicle_id'];
             $vehiclesWithTrips[$vid] = true;
+            $loaded = !empty($itemZones[(int) $vr['trip_id']]);
             $zones = [];
             if (!empty($vr['zone_id'])) {
                 $zones[(int) $vr['zone_id']] = true;
             }
-            foreach (array_keys($itemZones[(int) $vr['trip_id']] ?? []) as $zid) {
-                $zones[$zid] = true;
+            if ($loaded) {
+                foreach (array_keys($itemZones[(int) $vr['trip_id']]) as $zid) {
+                    $zones[$zid] = true;
+                }
             }
+            $merged = $loaded && count($zones) > 1;
+
             foreach (array_keys($zones) as $zid) {
                 $pair = $zid . ':' . $vid;
-                if (isset($seenPair[$pair])) {
+                $prev = $seenPair[$pair] ?? null;
+                if ($prev !== null && ($prev['loaded'] || !$loaded)) {
+                    // В зоне уже показан загруженный рейс машины (или другой пустой) — не дублируем
                     continue;
                 }
-                $seenPair[$pair] = true;
+                $seenPair[$pair] = ['loaded' => $loaded];
+                // Заменяем пустой чип машины загруженным, если он был раньше
+                $vehByZone[$zid] = array_values(array_filter(
+                    $vehByZone[$zid] ?? [],
+                    function ($e) use ($vid) {
+                        return (int) $e['vehicle_id'] !== $vid;
+                    }
+                ));
                 $vehByZone[$zid][] = [
                     'zone_id' => $zid,
                     'vehicle_id' => $vid,
                     'name' => $vr['name'],
                     'capacity_kg' => $vr['capacity_kg'],
+                    'empty' => !$loaded,
+                    'merged' => $merged,
+                    'note' => $merged ? $vr['note'] : null,
                 ];
             }
         }
@@ -83,8 +101,16 @@ class DeskVehicles
                 if (isset($seenPair[$pair])) {
                     continue;
                 }
-                $seenPair[$pair] = true;
-                $vehByZone[(int) $vr['zone_id']][] = $vr;
+                $seenPair[$pair] = ['loaded' => true];
+                $vehByZone[(int) $vr['zone_id']][] = [
+                    'zone_id' => (int) $vr['zone_id'],
+                    'vehicle_id' => $vid,
+                    'name' => $vr['name'],
+                    'capacity_kg' => $vr['capacity_kg'],
+                    'empty' => false,
+                    'merged' => false,
+                    'note' => null,
+                ];
             }
         }
 

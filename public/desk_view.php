@@ -5,12 +5,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Логистика доставки</title>
-<link rel="stylesheet" href="assets/css/style.css?v=15">
+<link rel="stylesheet" href="assets/css/style.css?v=16">
 <link rel="stylesheet" href="assets/css/mobile-ui.css?v=2">
 <?php if ($yandexKey !== ''): ?>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=<?= h($yandexKey) ?>&lang=ru_RU"></script>
 <?php endif; ?>
-<script src="assets/js/live.js?v=22" defer></script>
+<script src="assets/js/live.js?v=23" defer></script>
 <script src="assets/js/desk-dnd.js?v=11" defer></script>
 <script src="assets/js/map-markers.js?v=6" defer></script>
 <script src="assets/js/desk-compact-v2.js?v=13" defer></script>
@@ -61,9 +61,10 @@
       <span class="cap-orders meta-orders" title="Заявок"><span class="ic ic-box" aria-hidden="true"></span><?=$cnt?></span>
     </div>
     <div class="zone-vehicles">
-      <?php foreach($zv as $vv): ?>
-      <div class="veh-chip" data-vehicle-id="<?=(int)$vv['vehicle_id']?>" data-zone-id="<?=(int)$z['id']?>" data-cap="<?=(float)$vv['capacity_kg']?>"<?=$zCovered?' title="Машина везёт район сегодня (рейс собран)"':''?>>
+      <?php foreach($zv as $vv): $vEmpty = !empty($vv['empty']); $vMerged = !empty($vv['merged']); ?>
+      <div class="veh-chip<?=$vEmpty?' chip-empty':''?><?=$vMerged?' chip-merged':''?>" data-vehicle-id="<?=(int)$vv['vehicle_id']?>" data-zone-id="<?=(int)$z['id']?>"<?php if(!$vEmpty): ?> data-cap="<?=(float)$vv['capacity_kg']?>"<?php endif; ?> title="<?=$vMerged ? 'Объединённый рейс: машина везёт несколько районов' : ($vEmpty ? 'Пустой рейс — машина закреплена за зоной, заявок пока нет' : 'Перетащите в другую зону')?>">
         <span class="veh-name"><?=h($vv['name'])?></span>
+        <?php if($vMerged): ?><span class="veh-tag">объед.</span><?php endif; ?>
         <span class="veh-cap"><?=number_format((float)$vv['capacity_kg'],0,'.','')?> кг</span>
       </div>
       <?php endforeach; ?>
