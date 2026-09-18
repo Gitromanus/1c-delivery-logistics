@@ -125,7 +125,7 @@ async function ddApplyMove(drag, target, insertBeforeEl) {
     if (target.kind !== 'zone') return;
     if (drag.info.from_zone === target.zoneId) return;
     url = 'api/vehicle_zone.php';
-    params = { action: 'move', vehicle_id: drag.info.vehicle_id, from_zone_id: drag.info.from_zone, to_zone_id: target.zoneId };
+    params = { action: 'move', vehicle_id: drag.info.vehicle_id, from_zone_id: drag.info.from_zone, zone_id: target.zoneId };
   }
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(params) });
   const data = await r.json();
