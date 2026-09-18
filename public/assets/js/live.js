@@ -153,7 +153,9 @@
           var badge = card.querySelector('.badge-corner');
           if (badge) {
             if (cnt === 0) {
-              badge.textContent = '\u041F\u0443\u0441\u0442\u043E';
+              // Заявок нет, но район закреплён за рейсом (в т.ч. объединённым)
+              var covered = card.querySelectorAll('.veh-chip[data-vehicle-id]').length > 0;
+              badge.textContent = covered ? '\u0412\u0435\u0437\u0451\u043C' : '\u041F\u0443\u0441\u0442\u043E';
               badge.className = 'badge badge-ok badge-corner';
             } else if (noVeh) {
               badge.textContent = '\u041D\u0435\u0442 \u043C\u0430\u0448\u0438\u043D';

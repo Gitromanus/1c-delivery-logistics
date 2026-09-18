@@ -2,6 +2,8 @@
 
 /**
  * Машины в зонах на выбранную дату (из рейсов), без поломки истории.
+ * Объединённый рейс «покрывает» все зоны своих заявок: его машина
+ * показывается на карточке каждой такой зоны.
  */
 class DeskVehicles
 {
@@ -11,24 +13,56 @@ class DeskVehicles
     public static function byZoneForDate(PDO $pdo, string $date): array
     {
         $vehByZone = [];
-        $seenVeh = [];
+        $seenPair = [];
 
         $st = $pdo->prepare(
-            "SELECT t.zone_id, v.id AS vehicle_id, v.name, v.capacity_kg
+            "SELECT t.id AS trip_id, t.zone_id, v.id AS vehicle_id, v.name, v.capacity_kg
              FROM trips t
              JOIN vehicles v ON v.id = t.vehicle_id
-             WHERE t.trip_date = ? AND t.status <> 'cancelled' AND t.zone_id IS NOT NULL
-               AND v.is_active = 1
+             WHERE t.trip_date = ? AND t.status <> 'cancelled' AND v.is_active = 1
              ORDER BY v.name"
         );
         $st->execute([$date]);
-        foreach ($st->fetchAll() as $vr) {
+        $trips = $st->fetchAll();
+
+        // Зоны заявок каждого рейса (для объединённых рейсов)
+        $itemZoneStmt = $pdo->prepare(
+            "SELECT ti.trip_id, o.zone_id
+             FROM trip_items ti
+             JOIN orders o ON o.id = ti.order_id
+             JOIN trips t ON t.id = ti.trip_id
+             WHERE t.trip_date = ? AND t.status <> 'cancelled' AND o.zone_id IS NOT NULL"
+        );
+        $itemZoneStmt->execute([$date]);
+        $itemZones = [];
+        foreach ($itemZoneStmt->fetchAll() as $row) {
+            $itemZones[(int) $row['trip_id']][(int) $row['zone_id']] = true;
+        }
+
+        $vehiclesWithTrips = [];
+        foreach ($trips as $vr) {
             $vid = (int) $vr['vehicle_id'];
-            if (isset($seenVeh[$vid])) {
-                continue;
+            $vehiclesWithTrips[$vid] = true;
+            $zones = [];
+            if (!empty($vr['zone_id'])) {
+                $zones[(int) $vr['zone_id']] = true;
             }
-            $seenVeh[$vid] = true;
-            $vehByZone[(int) $vr['zone_id']][] = $vr;
+            foreach (array_keys($itemZones[(int) $vr['trip_id']] ?? []) as $zid) {
+                $zones[$zid] = true;
+            }
+            foreach (array_keys($zones) as $zid) {
+                $pair = $zid . ':' . $vid;
+                if (isset($seenPair[$pair])) {
+                    continue;
+                }
+                $seenPair[$pair] = true;
+                $vehByZone[$zid][] = [
+                    'zone_id' => $zid,
+                    'vehicle_id' => $vid,
+                    'name' => $vr['name'],
+                    'capacity_kg' => $vr['capacity_kg'],
+                ];
+            }
         }
 
         // Сегодня: машины без рейса — по vehicle_zones (шаблон по умолчанию)
@@ -42,10 +76,14 @@ class DeskVehicles
             )->fetchAll();
             foreach ($rows as $vr) {
                 $vid = (int) $vr['vehicle_id'];
-                if (isset($seenVeh[$vid])) {
+                if (isset($vehiclesWithTrips[$vid])) {
                     continue;
                 }
-                $seenVeh[$vid] = true;
+                $pair = (int) $vr['zone_id'] . ':' . $vid;
+                if (isset($seenPair[$pair])) {
+                    continue;
+                }
+                $seenPair[$pair] = true;
                 $vehByZone[(int) $vr['zone_id']][] = $vr;
             }
         }

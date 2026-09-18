@@ -10,7 +10,7 @@
 <?php if ($yandexKey !== ''): ?>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=<?= h($yandexKey) ?>&lang=ru_RU"></script>
 <?php endif; ?>
-<script src="assets/js/live.js?v=20" defer></script>
+<script src="assets/js/live.js?v=21" defer></script>
 <script src="assets/js/desk-dnd.js?v=11" defer></script>
 <script src="assets/js/map-markers.js?v=6" defer></script>
 <script src="assets/js/desk-compact-v2.js?v=13" defer></script>
@@ -44,6 +44,7 @@
     $zv=$vehByZone[$z['id']]??[]; $totCap=0;
     foreach($zv as $vv) $totCap+=(float)$vv['capacity_kg'];
     $nVeh=count($zv); $noVeh=($nVeh===0 && $w>0.01);
+    $zCovered = in_array((int)$z['id'], $coveredZoneIds, true);
     $zpct=$noVeh?100:($totCap>0?min(100,round($w/$totCap*100)):0);
     $barCls=$noVeh?'no-vehicle':($w>$totCap+0.01?'over':'');
     $wShow = number_format($w,0,'.','');
@@ -52,7 +53,7 @@
   <div class="zone-card" data-zone-drop="<?=(int)$z['id']?>" data-order-w="<?=$w?>" data-zone-compact="1" style="border-left:6px solid <?=h($zcolor)?>">
     <div class="name"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:<?=h($zcolor)?>;margin-right:6px;vertical-align:middle"></span><?=h($z['name'])?></div>
     <div class="meta" style="display:none"><?=$cnt?> заявок · <?=$wShow?> кг</div>
-    <span class="badge badge-corner <?=$noVeh?'badge-warn':'badge-ok'?>"><?=$cnt===0?'Пусто':($noVeh?'Нет машин':'В работе')?></span>
+    <span class="badge badge-corner <?=$noVeh?'badge-warn':'badge-ok'?>"><?=$cnt===0?($zCovered?'Везём':'Пусто'):($noVeh?'Нет машин':'В работе')?></span>
     <div class="bar <?=$barCls?>"><i style="width:<?=$zpct?>%"></i></div>
     <div class="zone-cap">
       <span class="cap-load" title="Загрузка, кг"><span class="ic ic-scale" aria-hidden="true"></span><?=$wShow?> / <?=$capShow?></span>
@@ -61,7 +62,7 @@
     </div>
     <div class="zone-vehicles">
       <?php foreach($zv as $vv): ?>
-      <div class="veh-chip" data-vehicle-id="<?=(int)$vv['vehicle_id']?>" data-zone-id="<?=(int)$z['id']?>" data-cap="<?=(float)$vv['capacity_kg']?>">
+      <div class="veh-chip" data-vehicle-id="<?=(int)$vv['vehicle_id']?>" data-zone-id="<?=(int)$z['id']?>" data-cap="<?=(float)$vv['capacity_kg']?>"<?=$zCovered?' title="Машина везёт район сегодня (рейс собран)"':''?>>
         <span class="veh-name"><?=h($vv['name'])?></span>
         <span class="veh-cap"><?=number_format((float)$vv['capacity_kg'],0,'.','')?> кг</span>
       </div>

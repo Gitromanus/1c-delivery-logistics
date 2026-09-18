@@ -133,6 +133,7 @@ foreach ($trips as $t) {
 foreach ($tripVehByZone as $zid => $vehList) {
     $vehByZone[$zid] = array_values($vehList);
 }
+$coveredZoneIds = array_map('intval', array_keys($tripVehByZone));
 
 if (($deskFilter['mode'] ?? '') === 'driver') {
     $vid = (int) ($deskFilter['vehicle_id'] ?? 0);
