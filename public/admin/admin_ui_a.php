@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Админка логистики</title>
-  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../assets/css/style.css?v=21">
   <link rel="stylesheet" href="../assets/css/mobile-ui.css?v=2">
   <script src="../assets/js/theme.js"></script>
   <?php if (!empty($config['yandex_maps_key'])): ?>
@@ -55,7 +55,7 @@
         <a class="<?= $tab==='settings'?'is-active':'' ?>" href="?tab=settings">API</a>
       </nav>
       <a class="btn btn-ghost btn-nav" href="../">Рабочий стол</a>
-      <a class="btn btn-ghost btn-nav" href="../logout.php">Выйти</a>
+      <a class="btn btn-ghost btn-nav btn-exit" href="../logout.php" title="Выйти" aria-label="Выйти"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 2.5v9"/><path d="M6.2 6.3a8 8 0 1 0 11.6 0"/></svg></a>
     </div>
   </header>
   <?php if ($msg): ?><div class="flash flash-ok"><?= htmlspecialchars($msg) ?></div><?php endif; ?>
