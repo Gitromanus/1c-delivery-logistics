@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Логистика доставки</title>
-<link rel="stylesheet" href="assets/css/style.css?v=14">
+<link rel="stylesheet" href="assets/css/style.css?v=15">
 <link rel="stylesheet" href="assets/css/mobile-ui.css?v=2">
 <?php if ($yandexKey !== ''): ?>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=<?= h($yandexKey) ?>&lang=ru_RU"></script>
@@ -106,14 +106,28 @@
     $nOrd=count($list);
     $sumShow=number_format($sum,0,'.','');
     $capShow=number_format($cap,0,'.','');
+    $canMerge = (($deskFilter['mode'] ?? 'all') === 'all') && $t['status'] !== 'done';
+    if ($canMerge) {
+      $mergedZoneIds = [(int)($t['zone_id'] ?? 0)];
+      foreach ($list as $o) { if (!empty($o['zone_id'])) $mergedZoneIds[] = (int)$o['zone_id']; }
+      $mergedZoneIds = array_values(array_unique($mergedZoneIds));
+    }
   ?>
   <div class="trip" data-trip-id="<?=(int)$t['id']?>" data-cap="<?=$cap?>">
     <div class="title">
       <span class="trip-name"><?=h($t['vehicle_name'])?><?=$t['plate']?' · '.h($t['plate']):''?></span>
       <div class="trip-actions">
+        <?php if ($canMerge): ?><button type="button" class="trip-add-zone" title="Добавить район на сегодня">+</button><?php endif; ?>
         <button type="button" class="trip-toggle">▾</button>
       </div>
     </div>
+    <?php if ($canMerge): ?>
+    <div class="zone-picker" hidden>
+      <?php foreach ($zones as $pz): if ((int)$pz['id'] === (int)($t['zone_id'] ?? 0)) continue; $inTrip = in_array((int)$pz['id'], $mergedZoneIds, true); ?>
+      <button type="button" data-zone-id="<?=(int)$pz['id']?>" data-in-trip="<?=$inTrip?1:0?>"><?=$inTrip?'✓ ':'+ '?><?=h($pz['name'])?></button>
+      <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
     <div class="muted"><?=h($t['zone_name']?:'Зона не указана')?><?php if(!empty($t['note'])): ?> · <span style="color:#e8710a"><?=h($t['note'])?></span><?php endif; ?> · <?=h($tripStatusLabels[$t['status']]??$t['status'])?></div>
     <div class="bar <?=$over?'over':''?>"><i style="width:<?=$pct?>%"></i></div>
     <div class="trip-weight muted" data-compact="1" data-compact-n="<?=$nOrd?>">
@@ -150,6 +164,46 @@ const zonePolys = <?= json_encode(array_map(function($p){
 
 document.querySelectorAll('.trip-toggle').forEach(function(btn){
   btn.addEventListener('click', function(){ btn.closest('.trip').classList.toggle('collapsed'); });
+});
+
+// «+ район» в шапке рейса: добавить/убрать район на сегодня
+document.querySelectorAll('.trip-add-zone').forEach(function(btn){
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    var picker = btn.closest('.trip').querySelector('.zone-picker');
+    document.querySelectorAll('.zone-picker').forEach(function(p){ if (p !== picker) p.hidden = true; });
+    if (picker) picker.hidden = !picker.hidden;
+  });
+});
+document.querySelectorAll('.zone-picker button').forEach(function(b){
+  b.addEventListener('click', async function(e){
+    e.stopPropagation();
+    var trip = b.closest('.trip');
+    b.disabled = true;
+    try {
+      var r = await fetch('api/trip_zone.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: b.getAttribute('data-in-trip') === '1' ? 'remove' : 'add',
+          trip_id: parseInt(trip.getAttribute('data-trip-id'), 10),
+          zone_id: parseInt(b.getAttribute('data-zone-id'), 10)
+        })
+      });
+      var d = await r.json();
+      if (!d.ok) throw new Error(d.error || 'Ошибка');
+      if (window.deskAckLocalChange) window.deskAckLocalChange();
+      location.reload();
+    } catch (err) {
+      alert(err.message || String(err));
+      b.disabled = false;
+    }
+  });
+});
+document.addEventListener('click', function(e){
+  if (!e.target.closest('.zone-picker') && !e.target.closest('.trip-add-zone')) {
+    document.querySelectorAll('.zone-picker').forEach(function(p){ p.hidden = true; });
+  }
 });
 var rb=document.getElementById('rebuildBtn');
 if(rb) rb.addEventListener('click', async function(){

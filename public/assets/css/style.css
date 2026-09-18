@@ -347,6 +347,33 @@ code { color: var(--accent); font-size: 0.85em; }
   vertical-align: 1px; text-transform: lowercase;
 }
 
+/* Кнопка «+ район» и выпадающий список районов в шапке рейса */
+.trip-add-zone {
+  width: 22px; height: 22px; padding: 0;
+  border-radius: 6px; border: 1px solid var(--card-border);
+  background: var(--chip-bg, rgba(255,255,255,.08));
+  color: var(--text, #eee); font-size: 14px; font-weight: 700;
+  line-height: 1; cursor: pointer;
+}
+.trip-add-zone:hover { border-color: #e8710a; color: #e8710a; }
+.trip { position: relative; }
+.zone-picker {
+  position: absolute; right: 10px; top: 30px; z-index: 30;
+  min-width: 180px; max-height: 260px; overflow: auto;
+  background: var(--panel-bg, #1b1f27);
+  border: 1px solid var(--card-border, #333);
+  border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.35);
+  padding: 4px;
+}
+.zone-picker button {
+  display: block; width: 100%; text-align: left;
+  padding: 6px 8px; margin: 2px 0;
+  border: 0; border-radius: 6px;
+  background: transparent; color: var(--text, #eee);
+  font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.zone-picker button:hover { background: rgba(232,113,10,.15); color: #e8710a; }
+
 .meta-orders {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 0.85rem; color: var(--muted); font-weight: 600;
