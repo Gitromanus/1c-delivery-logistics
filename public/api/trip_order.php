@@ -58,7 +58,14 @@ if ($action === 'reorder') {
         $zstmt = $pdo->prepare('SELECT zone_id FROM trips WHERE id = ?');
         $zstmt->execute([$tripId]);
         $zoneId = (int) $zstmt->fetchColumn();
-        if ($zoneId) {
+        // В объединённом рейсе заявки из нескольких зон — их порядки
+        // несравнимы, шаблон не трогаем.
+        $zc = $pdo->prepare(
+            'SELECT COUNT(DISTINCT o.zone_id) FROM trip_items ti
+             JOIN orders o ON o.id = ti.order_id WHERE ti.trip_id = ?'
+        );
+        $zc->execute([$tripId]);
+        if ($zoneId && (int) $zc->fetchColumn() <= 1) {
             $pstmt = $pdo->prepare(
                 "SELECT o.id, o.partner FROM trip_items ti
                  INNER JOIN orders o ON o.id = ti.order_id

@@ -34,12 +34,121 @@ class TripBuilder
                 $byZone[$zid][] = $o;
             }
 
+            // Справочники для объединённых рейсов: зоны и шаблоны порядка.
+            $zoneInfo = [];
+            foreach ($pdo->query('SELECT id, name, sort_order FROM zones WHERE is_active = 1') as $z) {
+                $zoneInfo[(int) $z['id']] = ['name' => $z['name'], 'sort' => (int) $z['sort_order']];
+            }
+            $tplMap = [];
+            try {
+                foreach ($pdo->query('SELECT zone_id, partner, position FROM route_templates') as $rt) {
+                    $tplMap[(int) $rt['zone_id']][(string) $rt['partner']] = (int) $rt['position'];
+                }
+            } catch (Throwable $e) {
+                // Таблицы шаблонов нет — объединённые рейсы без шаблонного порядка.
+            }
+
             $warnings = [];
             $tripsCreated = 0;
 
+            $ins = $pdo->prepare(
+                "INSERT INTO trips (trip_date, vehicle_id, zone_id, status, note) VALUES (?, ?, ?, 'draft', ?)"
+            );
+            $item = $pdo->prepare('INSERT INTO trip_items (trip_id, order_id, sort_order) VALUES (?, ?, ?)');
+            $mark = $pdo->prepare("UPDATE orders SET status = 'assigned' WHERE id = ?");
+
+            // --- Проход 1: совмещённые рейсы ---
+            // Машина, привязанная к нескольким зонам, при малой суммарной
+            // загрузке везёт все эти зоны одним рейсом. Если не влезает —
+            // зоны обрабатываются раздельно (проход 2).
+            $multi = $pdo->query(
+                "SELECT v.id, v.name, v.capacity_kg, GROUP_CONCAT(vz.zone_id) AS zone_ids
+                 FROM vehicles v
+                 INNER JOIN vehicle_zones vz ON vz.vehicle_id = v.id
+                 INNER JOIN zones z ON z.id = vz.zone_id AND z.is_active = 1
+                 WHERE v.is_active = 1
+                 GROUP BY v.id, v.name, v.capacity_kg
+                 HAVING COUNT(DISTINCT vz.zone_id) >= 2
+                 ORDER BY v.capacity_kg DESC, v.id"
+            )->fetchAll();
+
+            foreach ($multi as $v) {
+                $vZoneIds = array_map('intval', explode(',', (string) $v['zone_ids']));
+                $useZones = [];
+                foreach ($vZoneIds as $zid) {
+                    if (!empty($byZone[$zid])) {
+                        $useZones[] = $zid;
+                    }
+                }
+                if (count($useZones) < 2) {
+                    continue;
+                }
+
+                $pool = [];
+                $weight = 0.0;
+                foreach ($useZones as $zid) {
+                    foreach ($byZone[$zid] as $o) {
+                        $pool[] = $o;
+                        $weight += (float) $o['weight_kg'];
+                    }
+                }
+                if ($weight > (float) $v['capacity_kg'] + 0.0001) {
+                    continue;
+                }
+
+                usort($useZones, function ($a, $b) use ($zoneInfo) {
+                    return (($zoneInfo[$a]['sort'] ?? 999) <=> ($zoneInfo[$b]['sort'] ?? 999))
+                        ?: ($a <=> $b);
+                });
+                usort($pool, function ($a, $b) use ($zoneInfo, $tplMap) {
+                    $za = (int) $a['zone_id'];
+                    $zb = (int) $b['zone_id'];
+                    if ($za !== $zb) {
+                        return (($zoneInfo[$za]['sort'] ?? 999) <=> ($zoneInfo[$zb]['sort'] ?? 999));
+                    }
+                    $pa = $tplMap[$za][(string) $a['partner']] ?? 999999;
+                    $pb = $tplMap[$zb][(string) $b['partner']] ?? 999999;
+                    if ($pa !== $pb) {
+                        return $pa <=> $pb;
+                    }
+                    return (int) $a['id'] <=> (int) $b['id'];
+                });
+
+                $names = implode(' + ', array_map(function ($zid) use ($zoneInfo) {
+                    return $zoneInfo[$zid]['name'] ?? ('Зона #' . $zid);
+                }, $useZones));
+
+                $ins->execute([$date, $v['id'], $useZones[0], 'Объединённый рейс: ' . $names]);
+                $tripId = (int) $pdo->lastInsertId();
+                $tripsCreated++;
+
+                $i = 1;
+                foreach ($pool as $o) {
+                    $item->execute([$tripId, $o['id'], $i++]);
+                    $mark->execute([$o['id']]);
+                }
+                foreach ($useZones as $zid) {
+                    $byZone[$zid] = [];
+                }
+
+                $warnings[] = sprintf(
+                    'Объединённый рейс (%s): %s, %.0f / %.0f кг',
+                    $names,
+                    $v['name'],
+                    $weight,
+                    (float) $v['capacity_kg']
+                );
+            }
+
+            // --- Проход 2: обычные рейсы по зонам ---
             foreach ($byZone as $zoneId => $zoneOrders) {
                 if (!(int) $zoneId) {
-                    $warnings[] = 'Есть заявки без зоны: ' . count($zoneOrders) . ' шт.';
+                    if ($zoneOrders) {
+                        $warnings[] = 'Есть заявки без зоны: ' . count($zoneOrders) . ' шт.';
+                    }
+                    continue;
+                }
+                if (!$zoneOrders) {
                     continue;
                 }
 
@@ -91,18 +200,13 @@ class TripBuilder
                         }
                     }
 
-                    $ins = $pdo->prepare(
-                        "INSERT INTO trips (trip_date, vehicle_id, zone_id, status) VALUES (?, ?, ?, 'draft')"
-                    );
-                    $ins->execute([$date, $vehicle['id'], $zoneId]);
+                    $ins->execute([$date, $vehicle['id'], $zoneId, null]);
                     $tripId = (int) $pdo->lastInsertId();
                     $tripsCreated++;
 
-                    $item = $pdo->prepare('INSERT INTO trip_items (trip_id, order_id, sort_order) VALUES (?, ?, ?)');
-                    $upd = $pdo->prepare("UPDATE orders SET status = 'assigned' WHERE id = ?");
                     foreach ($batch as $i => $order) {
                         $item->execute([$tripId, $order['id'], $i + 1]);
-                        $upd->execute([$order['id']]);
+                        $mark->execute([$order['id']]);
                     }
 
                     if ($used > $capacity) {

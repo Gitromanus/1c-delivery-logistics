@@ -114,7 +114,7 @@
         <button type="button" class="trip-toggle">▾</button>
       </div>
     </div>
-    <div class="muted"><?=h($t['zone_name']?:'Зона не указана')?> · <?=h($tripStatusLabels[$t['status']]??$t['status'])?></div>
+    <div class="muted"><?=h($t['zone_name']?:'Зона не указана')?><?php if(!empty($t['note'])): ?> · <span style="color:#e8710a"><?=h($t['note'])?></span><?php endif; ?> · <?=h($tripStatusLabels[$t['status']]??$t['status'])?></div>
     <div class="bar <?=$over?'over':''?>"><i style="width:<?=$pct?>%"></i></div>
     <div class="trip-weight muted" data-compact="1" data-compact-n="<?=$nOrd?>">
       <span class="trip-load" title="Загрузка, кг"><span class="ic ic-scale" aria-hidden="true"></span><?=$sumShow?> / <?=$capShow?></span>
