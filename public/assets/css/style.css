@@ -138,6 +138,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 }
 .veh-chip:hover { border-color: var(--accent); }
 .veh-chip .veh-cap { color: var(--muted); font-weight: 600; }
+.veh-chip .veh-plate { font-weight: 700; font-size: 10px; letter-spacing: .02em; }
 .veh-chip.chip-merged { border-left: 3px solid #e8710a; }
 .veh-chip.chip-empty { opacity: .55; border-style: dashed; }
 .veh-tag {

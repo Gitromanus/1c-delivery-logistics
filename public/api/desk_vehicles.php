@@ -25,6 +25,9 @@ foreach ($vehByZone as $zid => $list) {
             'name' => $v['name'],
             'plate' => (string) ($v['plate'] ?? ''),
             'capacity_kg' => (float) $v['capacity_kg'],
+            'empty' => !empty($v['empty']),
+            'merged' => !empty($v['merged']),
+            'note' => $v['note'] ?? null,
         ];
     }
 }
