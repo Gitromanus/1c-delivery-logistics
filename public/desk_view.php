@@ -5,14 +5,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Логистика доставки</title>
-<link rel="stylesheet" href="assets/css/style.css?v=22">
+<link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
 <link rel="stylesheet" href="assets/css/mobile-ui.css?v=2">
 <?php if ($yandexKey !== ''): ?>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=<?= h($yandexKey) ?>&lang=ru_RU"></script>
 <?php endif; ?>
-<script src="assets/js/live.js?v=25" defer></script>
-<script src="assets/js/desk-dnd.js?v=11" defer></script>
-<script src="assets/js/map-markers.js?v=6" defer></script>
+<script src="assets/js/live.js?v=<?= filemtime(__DIR__ . '/assets/js/live.js') ?>" defer></script>
+<script src="assets/js/desk-dnd.js?v=<?= filemtime(__DIR__ . '/assets/js/desk-dnd.js') ?>" defer></script>
+<script src="assets/js/map-markers.js?v=<?= filemtime(__DIR__ . '/assets/js/map-markers.js') ?>" defer></script>
 <script src="assets/js/desk-compact-v2.js?v=13" defer></script>
 <script src="assets/js/theme.js"></script>
 </head>
