@@ -9,8 +9,10 @@ require dirname(__DIR__) . '/bootstrap.php';
 header('Content-Type: application/json; charset=utf-8');
 
 $config = require (defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__)) . '/config.php';
-$yandexKey = (string) ($config['yandex_geocoder_key'] ?? ($config['yandex_maps_key'] ?? ''));
-$dadataToken = (string) ($config['dadata_token'] ?? '');
+$yandexKey = class_exists('Settings') ? (string) Settings::get('yandex_geocoder_key', '') : '';
+if ($yandexKey === '') $yandexKey = (string) ($config['yandex_geocoder_key'] ?? ($config['yandex_maps_key'] ?? ''));
+$dadataToken = class_exists('Settings') ? (string) Settings::get('dadata_token', '') : '';
+if ($dadataToken === '') $dadataToken = (string) ($config['dadata_token'] ?? '');
 
 $date = $_GET['date'] ?? $_POST['date'] ?? date('Y-m-d');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {

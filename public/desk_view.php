@@ -215,8 +215,14 @@ if(gb) gb.addEventListener('click', async function(){
     var r=await fetch('api/geocode_front.php?date=<?=urlencode($date)?>',{cache:'no-store'});
     var d=await r.json();
     if(!d.ok) throw new Error(d.error||'Ошибка');
+    if(d.failed > 0 && d.sample_errors && d.sample_errors.length){
+      var msgs = d.sample_errors.map(function(e){ return '• ' + (e.address||('#'+e.id)) + ' — ' + (e.error||''); });
+      alert('Не удалось определить координаты (заявка осталась с пометкой «не на карте»):
+' + msgs.join('
+'));
+    }
     if(window.deskAckLocalChange) window.deskAckLocalChange();
-    location.reload();
+    if(d.geocoded > 0) { location.reload(); } else { gb.disabled=false; gb.textContent=t; }
   }catch(e){ alert(e.message||String(e)); gb.disabled=false; gb.textContent=t; }
 });
 var rb=document.getElementById('rebuildBtn');
