@@ -31,7 +31,7 @@
     <?php endif; ?>
     <a class="btn btn-ghost" href="admin/">Админка</a>
     <?php endif; ?>
-    <a class="btn btn-ghost btn-exit" href="logout.php" title="Выйти" aria-label="Выйти">&#128682;</a>
+    <a class="btn btn-ghost btn-exit" href="logout.php" title="Выйти" aria-label="Выйти"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 2.5v9"/><path d="M6.2 6.3a8 8 0 1 0 11.6 0"/></svg></a>
   </div>
 </header>
 <div class="grid">
