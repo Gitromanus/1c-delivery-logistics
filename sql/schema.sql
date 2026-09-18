@@ -79,4 +79,15 @@ CREATE TABLE IF NOT EXISTS trip_items (
   CONSTRAINT fk_ti_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Шаблон порядка объезда клиентов по зоне (заполняется при ручной
+-- перетаске заявок в рейсе, используется TripBuilder'ом при сборке).
+CREATE TABLE IF NOT EXISTS route_templates (
+  zone_id INT UNSIGNED NOT NULL,
+  partner VARCHAR(255) NOT NULL,
+  position INT NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (zone_id, partner),
+  CONSTRAINT fk_rt_zone FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 SET FOREIGN_KEY_CHECKS = 1;

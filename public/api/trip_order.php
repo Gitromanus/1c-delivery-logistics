@@ -49,6 +49,38 @@ if ($action === 'reorder') {
         $oid = (int) $oid;
         if ($oid > 0) { $stmt->execute([$i++, $tripId, $oid]); }
     }
+
+    // Запоминаем порядок клиентов как шаблон маршрута зоны:
+    // следующая сборка рейсов по этой зоне раскладывает заявки в этом же порядке.
+    try {
+        $zstmt = $pdo->prepare('SELECT zone_id FROM trips WHERE id = ?');
+        $zstmt->execute([$tripId]);
+        $zoneId = (int) $zstmt->fetchColumn();
+        if ($zoneId) {
+            $pstmt = $pdo->prepare(
+                "SELECT o.partner FROM trip_items ti
+                 INNER JOIN orders o ON o.id = ti.order_id
+                 WHERE ti.trip_id = ?
+                 ORDER BY ti.sort_order, o.id"
+            );
+            $pstmt->execute([$tripId]);
+            $seen = [];
+            foreach ($pstmt->fetchAll(PDO::FETCH_COLUMN) as $partner) {
+                if ($partner === null || $partner === '' || isset($seen[$partner])) {
+                    continue;
+                }
+                $seen[$partner] = true;
+                $up = $pdo->prepare(
+                    "INSERT INTO route_templates (zone_id, partner, position) VALUES (?, ?, ?)
+                     ON DUPLICATE KEY UPDATE position = VALUES(position)"
+                );
+                $up->execute([$zoneId, $partner, count($seen)]);
+            }
+        }
+    } catch (Throwable $e) {
+        // Нет таблицы route_templates (миграция не выполнена) — порядок в самом рейсе всё равно сохранён.
+    }
+
     echo json_encode(['ok' => true, 'action' => 'reorder']);
     exit;
 }

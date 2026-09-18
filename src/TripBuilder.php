@@ -22,8 +22,13 @@ class TripBuilder
             // Снимаем assigned с заявок дня, если они были только в draft (упростим: new + assigned за день без confirmed)
             $pdo->prepare("UPDATE orders SET status = 'new' WHERE doc_date = ? AND status = 'assigned'")->execute([$date]);
 
+            // Порядок заявок: сначала клиенты по сохранённому шаблону зоны
+            // (ручной порядок оператора), остальные — в конце, по id.
             $ordersStmt = $pdo->prepare(
-                "SELECT * FROM orders WHERE doc_date = ? AND status IN ('new','assigned') AND status <> 'cancelled' ORDER BY zone_id, id"
+                "SELECT o.* FROM orders o
+                 LEFT JOIN route_templates rt ON rt.zone_id = o.zone_id AND rt.partner = o.partner
+                 WHERE o.doc_date = ? AND o.status IN ('new','assigned') AND o.status <> 'cancelled'
+                 ORDER BY o.zone_id, COALESCE(rt.position, 999999), o.id"
             );
             $ordersStmt->execute([$date]);
             $orders = $ordersStmt->fetchAll();
