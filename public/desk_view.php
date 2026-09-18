@@ -36,11 +36,11 @@
   </div>
 </header>
 <div class="kpi-strip">
-  <div class="kpi-card"><div class="kpi-num kpi-blue"><?=$kpiOrders?></div><div class="kpi-label">заявок на дату</div></div>
-  <div class="kpi-card"><div class="kpi-num kpi-green"><?=$kpiDistributed?></div><div class="kpi-label">распределено</div></div>
-  <div class="kpi-card"><div class="kpi-num kpi-red"><?=$kpiUnassigned?></div><div class="kpi-label">не распределено</div></div>
-  <div class="kpi-card"><div class="kpi-num kpi-amber"><?=$kpiOverload?></div><div class="kpi-label">перегрузок</div></div>
-  <div class="kpi-card"><div class="kpi-num kpi-teal"><?=$kpiAvgLoad?>%</div><div class="kpi-label">средняя загрузка</div></div>
+  <div class="kpi-card"><span class="kpi-ic kpi-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span><div class="kpi-body"><div class="kpi-num kpi-blue"><?=$kpiOrders?></div><div class="kpi-label">заявок на дату</div></div></div>
+  <div class="kpi-card"><span class="kpi-ic kpi-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg></span><div class="kpi-body"><div class="kpi-num kpi-green"><?=$kpiDistributed?></div><div class="kpi-label">распределено</div></div></div>
+  <div class="kpi-card"><span class="kpi-ic kpi-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.5h.01"/></svg></span><div class="kpi-body"><div class="kpi-num kpi-red"><?=$kpiUnassigned?></div><div class="kpi-label">не распределено</div></div></div>
+  <div class="kpi-card"><span class="kpi-ic kpi-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span><div class="kpi-body"><div class="kpi-num kpi-amber"><?=$kpiOverload?></div><div class="kpi-label">перегрузок</div></div></div>
+  <div class="kpi-card"><span class="kpi-ic kpi-teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15l3.5-3.5"/><path d="M20.5 15.5a8.5 8.5 0 1 0-17 0"/></svg></span><div class="kpi-body"><div class="kpi-num kpi-teal"><?=$kpiAvgLoad?>%</div><div class="kpi-label">средняя загрузка</div></div></div>
 </div>
 <div class="grid">
 <section class="panel">

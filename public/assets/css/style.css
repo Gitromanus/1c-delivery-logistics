@@ -153,11 +153,22 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 /* Сводка по дате над сеткой */
 .kpi-strip { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 12px; }
 .kpi-card {
-  flex: 1; min-width: 130px;
+  flex: 1; min-width: 150px;
   background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-  padding: 10px 14px; display: flex; align-items: baseline; gap: 10px;
+  padding: 9px 12px; display: flex; align-items: center; gap: 10px;
 }
-.kpi-num { font-size: 1.4rem; font-weight: 700; line-height: 1; }
+.kpi-ic {
+  width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.kpi-ic svg { width: 17px; height: 17px; }
+.kpi-ic.kpi-blue { color: #4a90d9; background: rgba(74,144,217,.14); }
+.kpi-ic.kpi-green { color: #3aa76d; background: rgba(58,167,109,.14); }
+.kpi-ic.kpi-red { color: #e05252; background: rgba(224,82,82,.14); }
+.kpi-ic.kpi-amber { color: #e8a10a; background: rgba(232,161,10,.14); }
+.kpi-ic.kpi-teal { color: #1ca8a0; background: rgba(28,168,160,.14); }
+.kpi-body { min-width: 0; }
+.kpi-num { font-size: 1.4rem; font-weight: 700; line-height: 1.1; }
 .kpi-blue { color: #4a90d9; }
 .kpi-green { color: #3aa76d; }
 .kpi-red { color: #e05252; }
