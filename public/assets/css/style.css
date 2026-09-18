@@ -157,6 +157,14 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 /* Номер заявки в порядке рейса */
 .ord-seq { color: #4a90d9; font-weight: 700; margin-right: 6px; }
 
+/* Заявка без координат (не попала на карту) */
+.ord-geo-badge {
+  display: inline-block; margin-left: 6px;
+  font-size: 9px; font-weight: 700; line-height: 1;
+  padding: 2px 5px; border-radius: 999px;
+  color: var(--muted); border: 1px dashed var(--border);
+}
+
 .dd-ghost {
   z-index: 10000; opacity: 1; background: var(--order-bg);
   border: 1px solid var(--card-border); border-radius: 8px;

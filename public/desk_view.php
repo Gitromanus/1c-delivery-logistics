@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Логистика доставки</title>
-<link rel="stylesheet" href="assets/css/style.css?v=21">
+<link rel="stylesheet" href="assets/css/style.css?v=22">
 <link rel="stylesheet" href="assets/css/mobile-ui.css?v=2">
 <?php if ($yandexKey !== ''): ?>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=<?= h($yandexKey) ?>&lang=ru_RU"></script>
@@ -27,7 +27,8 @@
     <?php if (!class_exists('Auth') || Auth::isAdmin() || !empty($_SESSION['config_admin'])): ?>
     <button type="button" class="btn btn-ghost" id="rebuildBtn">Пересобрать</button>
     <?php if ($yandexKey !== '' && !empty($needGeo)): ?>
-    <button type="button" class="btn btn-primary" id="geocodeBtn">Геокод (<?= count($needGeo) ?>)</button>
+    <?php $needGeoNums = array_map(function($p){ return $p['number'] ?: $p['external_id']; }, $needGeo); ?>
+    <button type="button" class="btn btn-primary" id="geocodeBtn" title="Без координат (не на карте): <?= h(implode(', ', array_slice($needGeoNums, 0, 10))) ?><?= count($needGeoNums) > 10 ? ' …' : '' ?>">Геокод (<?= count($needGeo) ?>)</button>
     <?php endif; ?>
     <a class="btn btn-ghost" href="admin/">Админка</a>
     <?php endif; ?>
@@ -84,10 +85,10 @@
   <div id="unassignedZone" style="min-height:72px;border:2px dashed var(--border);border-radius:10px;padding:8px">
     <?php if(!$freeOrders): ?>
     <p class="muted" style="text-align:center">Пусто</p>
-    <?php else: foreach($freeOrders as $o): ?>
+    <?php else: foreach($freeOrders as $o): $noGeo = empty($o['lat']) || empty($o['lon']); ?>
     <div class="drag-order" data-order-id="<?=(int)$o['id']?>" data-from-trip="" data-weight="<?=(float)$o['weight_kg']?>">
       <div class="ord-body">
-        <div class="ord-num"><?=h($o['number']?:$o['external_id'])?></div>
+        <div class="ord-num"><?=h($o['number']?:$o['external_id'])?><?php if($noGeo): ?> <span class="ord-geo-badge" title="Нет координат — заявка не отображается на карте">не на карте</span><?php endif; ?></div>
         <div class="ord-addr"><?=h($o['address'])?></div>
         <?php if (!empty($o['partner'])): ?>
         <div class="ord-partner"><?=h($o['partner'])?></div>
@@ -138,10 +139,10 @@
     </div>
     <div class="trip-body">
       <div class="orders-list" style="margin-top:8px">
-        <?php $seq = 0; foreach($list as $o): $seq++; $isNewRoute = ($o['tpl_pos'] === null); ?>
+        <?php $seq = 0; foreach($list as $o): $seq++; $isNewRoute = ($o['tpl_pos'] === null); $noGeo = empty($o['lat']) || empty($o['lon']); ?>
         <div class="drag-order<?=$isNewRoute?' route-new':''?>" data-order-id="<?=(int)$o['id']?>" data-from-trip="<?=(int)$t['id']?>" data-weight="<?=(float)$o['weight_kg']?>"<?=$isNewRoute?' title="Клиента ещё нет в сохранённом порядке маршрута — перетащите в нужное место"':''?>>
           <div class="ord-body">
-            <div class="ord-num"><span class="ord-seq">#<?=$seq?></span><?=h($o['number']?:$o['external_id'])?><?php if($isNewRoute): ?> <span class="ord-new-badge">новый</span><?php endif; ?></div>
+            <div class="ord-num"><span class="ord-seq">#<?=$seq?></span><?=h($o['number']?:$o['external_id'])?><?php if($isNewRoute): ?> <span class="ord-new-badge">новый</span><?php endif; ?><?php if($noGeo): ?> <span class="ord-geo-badge" title="Нет координат — заявка не отображается на карте">не на карте</span><?php endif; ?></div>
             <div class="ord-addr"><?=h($o['address'])?></div>
             <?php if (!empty($o['partner'])): ?>
             <div class="ord-partner"><?=h($o['partner'])?></div>
@@ -206,6 +207,17 @@ document.addEventListener('click', function(e){
   if (!e.target.closest('.zone-picker') && !e.target.closest('.trip-add-zone')) {
     document.querySelectorAll('.zone-picker').forEach(function(p){ p.hidden = true; });
   }
+});
+var gb=document.getElementById('geocodeBtn');
+if(gb) gb.addEventListener('click', async function(){
+  gb.disabled=true; var t=gb.textContent; gb.textContent='Геокод…';
+  try{
+    var r=await fetch('api/geocode_front.php?date=<?=urlencode($date)?>',{cache:'no-store'});
+    var d=await r.json();
+    if(!d.ok) throw new Error(d.error||'Ошибка');
+    if(window.deskAckLocalChange) window.deskAckLocalChange();
+    location.reload();
+  }catch(e){ alert(e.message||String(e)); gb.disabled=false; gb.textContent=t; }
 });
 var rb=document.getElementById('rebuildBtn');
 if(rb) rb.addEventListener('click', async function(){
