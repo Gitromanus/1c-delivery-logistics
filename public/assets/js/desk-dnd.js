@@ -115,8 +115,8 @@ async function ddApplyMove(drag, target, insertBeforeEl) {
       if (!fromTrip) {
         params = { action: 'add', order_id: oid, to_trip_id: target.tripId };
       } else if (String(fromTrip) === String(target.tripId)) {
-        var list = ddBuildOrderList(target.container, oid, null);
-        params = { action: 'reorder', trip_id: target.tripId, order_ids: list };
+        var list = ddBuildOrderList(target.container, oid, insertBeforeEl);
+        params = { action: 'reorder', trip_id: target.tripId, order_ids: list, moved_order_id: oid };
       } else {
         params = { action: 'move', order_id: oid, from_trip_id: parseInt(fromTrip, 10), to_trip_id: target.tripId };
       }
@@ -133,9 +133,24 @@ async function ddApplyMove(drag, target, insertBeforeEl) {
   if (window.deskAckLocalChange) window.deskAckLocalChange();
   location.reload();
 }
-function ddBuildOrderList(container, orderId, y) {
+function ddBuildOrderList(container, orderId, insertBeforeEl) {
+  // Порядок заявок после сброса: перетаскиваемая ставится на позицию
+  // курсора (перед insertBeforeEl — элементом, перед которым был gap),
+  // остальные остаются в текущем порядке.
   const all = Array.from(container.querySelectorAll(':scope > .drag-order'));
-  return all.map(function (o) { return parseInt(o.getAttribute('data-order-id'), 10); }).filter(Boolean);
+  const beforeId = insertBeforeEl ? parseInt(insertBeforeEl.getAttribute('data-order-id'), 10) : 0;
+  const others = [];
+  all.forEach(function (o) {
+    const id = parseInt(o.getAttribute('data-order-id'), 10);
+    if (id && id !== orderId) others.push(id);
+  });
+  if (beforeId && beforeId !== orderId) {
+    const i = others.indexOf(beforeId);
+    if (i >= 0) others.splice(i, 0, orderId); else others.push(orderId);
+  } else {
+    others.push(orderId);
+  }
+  return others;
 }
 
 document.addEventListener('mousedown', function (e) {

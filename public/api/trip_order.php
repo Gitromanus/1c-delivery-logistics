@@ -50,31 +50,56 @@ if ($action === 'reorder') {
         if ($oid > 0) { $stmt->execute([$i++, $tripId, $oid]); }
     }
 
-    // Запоминаем порядок клиентов как шаблон маршрута зоны:
-    // следующая сборка рейсов по этой зоне раскладывает заявки в этом же порядке.
+    // Шаблон маршрута зоны обновляем точечно: позиции клиентов, уже
+    // находящихся в шаблоне, пересчитываются по новому порядку рейса, а
+    // новым в шаблон добавляется только клиент перемещённой заявки.
+    // Клиенты, которых оператор ещё не расставлял, в шаблон не попадают.
     try {
         $zstmt = $pdo->prepare('SELECT zone_id FROM trips WHERE id = ?');
         $zstmt->execute([$tripId]);
         $zoneId = (int) $zstmt->fetchColumn();
         if ($zoneId) {
             $pstmt = $pdo->prepare(
-                "SELECT o.partner FROM trip_items ti
+                "SELECT o.id, o.partner FROM trip_items ti
                  INNER JOIN orders o ON o.id = ti.order_id
                  WHERE ti.trip_id = ?
                  ORDER BY ti.sort_order, o.id"
             );
             $pstmt->execute([$tripId]);
+
+            $exStmt = $pdo->prepare('SELECT partner FROM route_templates WHERE zone_id = ?');
+            $exStmt->execute([$zoneId]);
+            $existing = array_flip($exStmt->fetchAll(PDO::FETCH_COLUMN));
+
+            $movedPartner = null;
+            $movedOrderId = (int) ($data['moved_order_id'] ?? 0);
+            if ($movedOrderId > 0) {
+                $mp = $pdo->prepare('SELECT partner FROM orders WHERE id = ?');
+                $mp->execute([$movedOrderId]);
+                $movedPartner = $mp->fetchColumn();
+                if ($movedPartner === false || $movedPartner === '') {
+                    $movedPartner = null;
+                }
+            }
+
             $seen = [];
-            foreach ($pstmt->fetchAll(PDO::FETCH_COLUMN) as $partner) {
-                if ($partner === null || $partner === '' || isset($seen[$partner])) {
+            foreach ($pstmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $p = $row['partner'];
+                if ($p === null || $p === '' || isset($seen[$p])) {
                     continue;
                 }
-                $seen[$partner] = true;
-                $up = $pdo->prepare(
-                    "INSERT INTO route_templates (zone_id, partner, position) VALUES (?, ?, ?)
-                     ON DUPLICATE KEY UPDATE position = VALUES(position)"
-                );
-                $up->execute([$zoneId, $partner, count($seen)]);
+                if (isset($existing[$p]) || ($movedPartner !== null && $p === $movedPartner)) {
+                    $seen[$p] = true;
+                }
+            }
+
+            $up = $pdo->prepare(
+                "INSERT INTO route_templates (zone_id, partner, position) VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE position = VALUES(position)"
+            );
+            $pos = 1;
+            foreach (array_keys($seen) as $p) {
+                $up->execute([$zoneId, $p, $pos++]);
             }
         }
     } catch (Throwable $e) {
