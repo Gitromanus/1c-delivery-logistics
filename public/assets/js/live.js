@@ -277,6 +277,13 @@
         if (lastVersion === null) { lastVersion = data.version; return; }
         if (data.version === lastVersion) return;
         if (Date.now() < quietUntil) { lastVersion = data.version; return; }
+        // Прилетела новая заявка (вырос max_id) — после перезагрузки
+        // наводим карту на её точку.
+        var pv = String(lastVersion).split('-');
+        var nv = String(data.version).split('-');
+        if (data.last_order_id > 0 && pv.length > 1 && nv.length > 1 && parseInt(nv[1], 10) > parseInt(pv[1], 10)) {
+          try { sessionStorage.setItem('logistics_flash_order', String(data.last_order_id)); } catch (e) {}
+        }
         lastVersion = data.version;
         document.title = '\u25CF \u041B\u043E\u0433\u0438\u0441\u0442\u0438\u043A\u0430 \u2014 \u043D\u043E\u0432\u044B\u0435 \u0437\u0430\u044F\u0432\u043A\u0438';
         location.reload();
@@ -284,9 +291,27 @@
       .catch(function () {});
   }
 
+  // После перезагрузки страницы навести карту на новую заявку.
+  function flashNewOrder() {
+    var id = 0;
+    try { id = parseInt(sessionStorage.getItem('logistics_flash_order'), 10) || 0; } catch (e) {}
+    if (!id) return;
+    try { sessionStorage.removeItem('logistics_flash_order'); } catch (e) {}
+    var tries = 0;
+    var t = setInterval(function () {
+      tries++;
+      var mark = window.orderMarks && (window.orderMarks[id] || window.orderMarks[String(id)]);
+      if (mark || tries > 75) {
+        clearInterval(t);
+        if (typeof window.highlightOrder === 'function') window.highlightOrder(id);
+      }
+    }, 200);
+  }
+
   function start() {
     placeVehiclesByDate();
     ensureEmptyTrips();
+    flashNewOrder();
     if (timer) clearInterval(timer);
     poll();
     timer = setInterval(poll, intervalMs);

@@ -52,5 +52,6 @@ echo json_encode([
     'date' => $date,
     'version' => $version,
     'orders' => (int) $ord['cnt'],
+    'last_order_id' => (int) $ord['max_id'],
     'free' => $freeCnt,
 ], JSON_UNESCAPED_UNICODE);
