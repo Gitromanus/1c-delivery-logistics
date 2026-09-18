@@ -217,9 +217,7 @@ if(gb) gb.addEventListener('click', async function(){
     if(!d.ok) throw new Error(d.error||'Ошибка');
     if(d.failed > 0 && d.sample_errors && d.sample_errors.length){
       var msgs = d.sample_errors.map(function(e){ return '• ' + (e.address||('#'+e.id)) + ' — ' + (e.error||''); });
-      alert('Не удалось определить координаты (заявка осталась с пометкой «не на карте»):
-' + msgs.join('
-'));
+      alert('Не удалось определить координаты (заявка осталась с пометкой «не на карте»):\n' + msgs.join('\n'));
     }
     if(window.deskAckLocalChange) window.deskAckLocalChange();
     if(d.geocoded > 0) { location.reload(); } else { gb.disabled=false; gb.textContent=t; }
