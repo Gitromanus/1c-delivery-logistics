@@ -187,6 +187,31 @@ $needGeo = array_values(array_filter($mapPoints, function ($p) {
     return empty($p['lat']) || empty($p['lon']);
 }));
 
+// Сводка по выбранной дате (для полосы сверху)
+$kpiOrders = count($mapPoints);
+$kpiDistributed = count($allowedOrderIds);
+$kpiOverload = 0;
+$kpiLoad = [];
+foreach ($trips as $t) {
+    $items = $itemsByTrip[(int) $t['id']] ?? [];
+    if (!$items) {
+        continue;
+    }
+    $w = 0.0;
+    foreach ($items as $it) {
+        $w += (float) $it['weight_kg'];
+    }
+    $cap = (float) $t['capacity_kg'];
+    if ($w > $cap + 0.01) {
+        $kpiOverload++;
+    }
+    if ($cap > 0) {
+        $kpiLoad[] = $w / $cap;
+    }
+}
+$kpiAvgLoad = $kpiLoad ? round(array_sum($kpiLoad) / count($kpiLoad) * 100) : 0;
+$kpiUnassigned = max(0, $kpiOrders - $kpiDistributed);
+
 if (!function_exists('h')) {
     function h(?string $s): string
     {

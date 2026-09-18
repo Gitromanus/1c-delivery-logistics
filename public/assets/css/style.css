@@ -150,6 +150,21 @@ input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
 }
 [data-zone-drop].drag-over { outline: 2px dashed var(--accent); outline-offset: -2px; }
 
+/* Сводка по дате над сеткой */
+.kpi-strip { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 12px; }
+.kpi-card {
+  flex: 1; min-width: 130px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 14px; display: flex; align-items: baseline; gap: 10px;
+}
+.kpi-num { font-size: 1.4rem; font-weight: 700; line-height: 1; }
+.kpi-blue { color: #4a90d9; }
+.kpi-green { color: #3aa76d; }
+.kpi-red { color: #e05252; }
+.kpi-amber { color: #e8a10a; }
+.kpi-teal { color: #1ca8a0; }
+.kpi-label { color: var(--muted); font-size: 0.8rem; }
+
 /* Кнопка «Выйти» — только значок */
 .btn-exit { display: inline-flex; align-items: center; justify-content: center; font-size: 1.05rem; line-height: 1; padding-left: 12px; padding-right: 12px; text-decoration: none; }
 .btn-exit svg { display: block; }

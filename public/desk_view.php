@@ -35,6 +35,13 @@
     <a class="btn btn-ghost btn-exit" href="logout.php" title="Выйти" aria-label="Выйти"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 2.5v9"/><path d="M6.2 6.3a8 8 0 1 0 11.6 0"/></svg></a>
   </div>
 </header>
+<div class="kpi-strip">
+  <div class="kpi-card"><div class="kpi-num kpi-blue"><?=$kpiOrders?></div><div class="kpi-label">заявок на дату</div></div>
+  <div class="kpi-card"><div class="kpi-num kpi-green"><?=$kpiDistributed?></div><div class="kpi-label">распределено</div></div>
+  <div class="kpi-card"><div class="kpi-num kpi-red"><?=$kpiUnassigned?></div><div class="kpi-label">не распределено</div></div>
+  <div class="kpi-card"><div class="kpi-num kpi-amber"><?=$kpiOverload?></div><div class="kpi-label">перегрузок</div></div>
+  <div class="kpi-card"><div class="kpi-num kpi-teal"><?=$kpiAvgLoad?>%</div><div class="kpi-label">средняя загрузка</div></div>
+</div>
 <div class="grid">
 <section class="panel">
   <h2>Зоны <?= h($date) ?></h2>
