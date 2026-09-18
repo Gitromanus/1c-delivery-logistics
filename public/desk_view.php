@@ -5,12 +5,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Логистика доставки</title>
-<link rel="stylesheet" href="assets/css/style.css?v=18">
+<link rel="stylesheet" href="assets/css/style.css?v=19">
 <link rel="stylesheet" href="assets/css/mobile-ui.css?v=2">
 <?php if ($yandexKey !== ''): ?>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=<?= h($yandexKey) ?>&lang=ru_RU"></script>
 <?php endif; ?>
-<script src="assets/js/live.js?v=24" defer></script>
+<script src="assets/js/live.js?v=25" defer></script>
 <script src="assets/js/desk-dnd.js?v=11" defer></script>
 <script src="assets/js/map-markers.js?v=6" defer></script>
 <script src="assets/js/desk-compact-v2.js?v=13" defer></script>
@@ -65,7 +65,7 @@
       <div class="veh-chip<?=$vEmpty?' chip-empty':''?><?=$vMerged?' chip-merged':''?>" data-vehicle-id="<?=(int)$vv['vehicle_id']?>" data-zone-id="<?=(int)$z['id']?>"<?php if(!$vEmpty): ?> data-cap="<?=(float)$vv['capacity_kg']?>"<?php endif; ?> title="<?=$vMerged ? 'Объединённый рейс: машина везёт несколько районов' : ($vEmpty ? 'Пустой рейс — машина закреплена за зоной, заявок пока нет' : 'Перетащите в другую зону')?>">
         <span class="veh-name"><?=h($vv['name'])?></span><?php if(!empty($vv['plate'])): ?> <span class="veh-plate"><?=h($vv['plate'])?></span><?php endif; ?>
         <?php if($vMerged): ?><span class="veh-tag">объед.</span><?php endif; ?>
-        <span class="veh-cap"><?=number_format((float)$vv['capacity_kg'],0,'.','')?> кг</span>
+        <span class="veh-cap"><?=number_format((float)$vv['capacity_kg'],0,'.','')?></span>
       </div>
       <?php endforeach; ?>
       <?php if(!$zv): ?><span class="muted zone-empty">нет машин</span><?php endif; ?>
