@@ -10,8 +10,8 @@
 <?php if ($yandexKey !== ''): ?>
 <script src="https://api-maps.yandex.ru/2.1/?apikey=<?= h($yandexKey) ?>&lang=ru_RU"></script>
 <?php endif; ?>
-<script src="assets/js/live.js?v=19" defer></script>
-<script src="assets/js/desk-dnd.js?v=9" defer></script>
+<script src="assets/js/live.js?v=20" defer></script>
+<script src="assets/js/desk-dnd.js?v=10" defer></script>
 <script src="assets/js/map-markers.js?v=6" defer></script>
 <script src="assets/js/desk-compact-v2.js?v=13" defer></script>
 <script src="assets/js/theme.js"></script>

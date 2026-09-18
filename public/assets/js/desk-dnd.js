@@ -197,7 +197,8 @@ document.addEventListener('mouseup', function (e) {
   ddFinish(e);
 });
 
-function highlightOrder(id) {
+function highlightOrder(id, opts) {
+  opts = opts || {};
   document.querySelectorAll('.drag-order').forEach(function (c) {
     c.style.outline = '';
     c.style.outlineOffset = '';
@@ -213,7 +214,9 @@ function highlightOrder(id) {
   if (card) {
     card.style.outline = '2px solid #f59e0b';
     card.style.outlineOffset = '-2px';
-    try { card.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+    if (opts.scroll !== false) {
+      try { card.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+    }
   }
   var m = marks[id] || marks[String(id)];
   if (m) {

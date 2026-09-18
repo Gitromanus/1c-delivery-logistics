@@ -303,7 +303,8 @@
       var mark = window.orderMarks && (window.orderMarks[id] || window.orderMarks[String(id)]);
       if (mark || tries > 75) {
         clearInterval(t);
-        if (typeof window.highlightOrder === 'function') window.highlightOrder(id);
+        // Только наведение карты: страницу не прокручиваем к карточке.
+        if (typeof window.highlightOrder === 'function') window.highlightOrder(id, { scroll: false });
       }
     }, 200);
   }
